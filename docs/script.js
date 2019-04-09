@@ -32,8 +32,9 @@ function setup() {
   }
   pixelDensity(1);
 
-  // createCanvas(windowWidth, windowHeight);
-  createCanvas(canvasW * scale * ditherScale, canvasH * scale * ditherScale);
+  var canvas = createCanvas(canvasW * scale * ditherScale, canvasH * scale * ditherScale);
+  // Move the canvas so it’s inside our <div id="sketch-holder">.
+  canvas.parent('sketch-holder');
   background(0, 100, 200);
 
   // generate random noise 1x1
@@ -82,6 +83,8 @@ function setup() {
   pixels.forEach((item, index) => (pixels[index] = ditherScaleImg[index]));
 
   updatePixels();
+  noLoop();
+
 }
 
 let getColor = function() {
