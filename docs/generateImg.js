@@ -1,7 +1,7 @@
-let img1BitTo32Bit = pixels => {
+let img8BitTo32Bit = pixels => {
   let newPixel = [];
   pixels.forEach(item => {
-    let color = parseInt(item * 255);
+    let color = parseInt(item);
     newPixel.push(color);
     newPixel.push(color);
     newPixel.push(color);

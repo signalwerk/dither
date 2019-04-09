@@ -8,7 +8,7 @@ let config = {
   pixelWidth: 12, // each blocks is 6×6px
   upscaleFactor: 2, // the resulting image
   seed: false, // seed for random generator if false eacht execution is random
-  colorFactor: 0.65 // lighten the overall color
+  colorFactor: 0.75 // darken the overall color
 };
 
 let canvasW = config.width;
@@ -32,9 +32,12 @@ function setup() {
   }
   pixelDensity(1);
 
-  var canvas = createCanvas(canvasW * scale * ditherScale, canvasH * scale * ditherScale);
+  var canvas = createCanvas(
+    canvasW * scale * ditherScale,
+    canvasH * scale * ditherScale
+  );
   // Move the canvas so it’s inside our <div id="sketch-holder">.
-  canvas.parent('sketch-holder');
+  canvas.parent("sketch-holder");
   background(0, 100, 200);
 
   // generate random noise 1x1
@@ -44,14 +47,14 @@ function setup() {
     }
   }
 
-  // write dark background 1x5
-  for (let i = 0; i <= 60; i++) {
+  // write dark background
+  for (let i = 0; i <= canvasW * canvasH * 0.075; i++) {
     pixelDrawer(getColor(), 5, (canvasW * canvasH) / 120);
   }
 
-  pixelDrawer(1, 4, (canvasW * canvasH) / 120);
+  pixelDrawer(255, 4, (canvasW * canvasH) / 120);
 
-  scaleImg = imgScaler(img1BitTo32Bit(randomImg), canvasW, canvasH, scale);
+  scaleImg = imgScaler(img8BitTo32Bit(randomImg), canvasW, canvasH, scale);
 
   const pointContainer = utils.PointContainer.fromUint8Array(
     scaleImg,
@@ -84,11 +87,10 @@ function setup() {
 
   updatePixels();
   noLoop();
-
 }
 
 let getColor = function() {
-  return random() * config.colorFactor;
+  return random() * 255 * config.colorFactor;
 };
 
 let pixelDrawer = function(c, height, totalRun) {

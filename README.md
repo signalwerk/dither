@@ -12,7 +12,7 @@ let config = {
   pixelWidth: 6,      // each blocks is 6×6px
   upscaleFactor: 1,   // the resulting image
   seed: 44,           // seed for random generator
-  colorFactor: 0.75,  // lighten the overall color
+  colorFactor: 0.75,  // darken the overall color
 }
 ```
 
