@@ -2,23 +2,32 @@ let iq = window["image-q"];
 
 let { buildPaletteSync, applyPaletteSync, utils } = iq;
 
-let canvasW = 20;
-let canvasH = 100;
+let config = {
+  width: 20,
+  height: 100,
+  pixelWidth: 12,
+  upscaleFactor: 3,
+  seed: 42,
+  colorFactor: 0.65
+};
+
+let canvasW = config.width;
+let canvasH = config.height;
 let randomImg = [];
 
 // scale image by factor
-let scale = 12;
+let scale = config.pixelWidth;
 let scaleImg = []; // holds scaled img
 
 let ditherImg = []; // holds dithered img
 
 // scale the final image
-let ditherScale = 3;
+let ditherScale = config.upscaleFactor;
 let ditherScaleImg = []; // holds scaled img
 
 function setup() {
   // reproducable function
-  randomSeed(42);
+  randomSeed(config.seed);
   pixelDensity(1);
 
   // createCanvas(windowWidth, windowHeight);
@@ -74,7 +83,7 @@ function setup() {
 }
 
 let getColor = function() {
-  return random() * 0.65;
+  return random() * config.colorFactor;
 };
 
 let pixelDrawer = function(c, height, totalRun) {
