@@ -1,5 +1,5 @@
 # Dither Generator
-Generation of dither patterns. 
+Generation of dither patterns.
 
 ## Knitting
 The Patterns are developed for Knitting
@@ -7,12 +7,12 @@ The Patterns are developed for Knitting
 ### Pattern
 ```js
 let config = {
-  width: 8,
-  height: 20,
-  pixelWidth: 6,
-  upscaleFactor: 1,
-  seed: 44,
-  colorFactor: 0.75,
+  width: 8,           // blocks width
+  height: 20,         // blocks width
+  pixelWidth: 6,      // each blocks is 6×6px
+  upscaleFactor: 1,   // the resulting image
+  seed: 44,           // seed for random generator
+  colorFactor: 0.75,  // lighten the overall color
 }
 ```
 

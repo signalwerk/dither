@@ -3,12 +3,12 @@ let iq = window["image-q"];
 let { buildPaletteSync, applyPaletteSync, utils } = iq;
 
 let config = {
-  width: 20,
-  height: 100,
-  pixelWidth: 12,
-  upscaleFactor: 3,
-  seed: 42,
-  colorFactor: 0.65
+  width: 20, // blocks width
+  height: 100, // blocks width
+  pixelWidth: 12, // each blocks is 6×6px
+  upscaleFactor: 3, // the resulting image
+  seed: 42, // seed for random generator
+  colorFactor: 0.65 // lighten the overall color
 };
 
 let canvasW = config.width;
