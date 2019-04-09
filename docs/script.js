@@ -4,10 +4,10 @@ let { buildPaletteSync, applyPaletteSync, utils } = iq;
 
 let config = {
   width: 20, // blocks width
-  height: 100, // blocks width
+  height: 40, // blocks width
   pixelWidth: 12, // each blocks is 6×6px
-  upscaleFactor: 3, // the resulting image
-  seed: 42, // seed for random generator
+  upscaleFactor: 2, // the resulting image
+  seed: false, // seed for random generator if false eacht execution is random
   colorFactor: 0.65 // lighten the overall color
 };
 
@@ -27,7 +27,9 @@ let ditherScaleImg = []; // holds scaled img
 
 function setup() {
   // reproducable function
-  randomSeed(config.seed);
+  if (config.seed) {
+    randomSeed(config.seed);
+  }
   pixelDensity(1);
 
   // createCanvas(windowWidth, windowHeight);
