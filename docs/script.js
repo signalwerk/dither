@@ -4,11 +4,11 @@ let { buildPaletteSync, applyPaletteSync, utils } = iq;
 
 let config = {
   width: 20, // blocks width
-  height: 40, // blocks width
-  pixelWidth: 12, // each blocks is 6×6px
+  height: 40, // blocks height
+  pixelWidth: 12, // each blocks is 6 × 6px
   upscaleFactor: 2, // the resulting image
   seed: false, // seed for random generator if false eacht execution is random
-  colorFactor: 0.75 // darken the overall color
+  colorFactor: 0.75, // darken the overall color
 };
 
 let canvasW = config.width;
@@ -34,7 +34,7 @@ function setup() {
 
   var canvas = createCanvas(
     canvasW * scale * ditherScale,
-    canvasH * scale * ditherScale
+    canvasH * scale * ditherScale,
   );
   // Move the canvas so it’s inside our <div id="sketch-holder">.
   canvas.parent("sketch-holder");
@@ -59,7 +59,7 @@ function setup() {
   const pointContainer = utils.PointContainer.fromUint8Array(
     scaleImg,
     canvasW * scale,
-    canvasH * scale
+    canvasH * scale,
   );
 
   const palette = new utils.Palette();
@@ -69,7 +69,7 @@ function setup() {
 
   const outPointContainer = applyPaletteSync(pointContainer, palette, {
     colorDistanceFormula: "euclidean", // optional
-    imageQuantization: "jarvis" // optional
+    imageQuantization: "jarvis", // optional
   });
 
   ditherImg = outPointContainer.toUint8Array();
@@ -78,7 +78,7 @@ function setup() {
     ditherImg,
     canvasW * scale,
     canvasH * scale,
-    ditherScale
+    ditherScale,
   );
 
   loadPixels();
@@ -89,11 +89,11 @@ function setup() {
   noLoop();
 }
 
-let getColor = function() {
+let getColor = function () {
   return random() * 255 * config.colorFactor;
 };
 
-let pixelDrawer = function(c, height, totalRun) {
+let pixelDrawer = function (c, height, totalRun) {
   for (let i = 0; i < totalRun; i++) {
     // Pick a random x, y
 
@@ -124,12 +124,12 @@ function keyTyped() {
   if (key === "s") {
     let img = createImage(
       canvasW * scale * ditherScale,
-      canvasH * scale * ditherScale
+      canvasH * scale * ditherScale,
     );
     img.loadPixels();
 
     ditherScaleImg.forEach(
-      (item, index) => (img.pixels[index] = ditherScaleImg[index])
+      (item, index) => (img.pixels[index] = ditherScaleImg[index]),
     );
 
     img.updatePixels();

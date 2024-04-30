@@ -14,7 +14,7 @@ April 2024
 let config = {
   width: 5, // block width
   height: 34, // block height
-  pixelWidth: 8, // each blocks is 6 × 6px
+  pixelWidth: 8, // each blocks is 8 × 8px
   upscaleFactor: 1, // the resulting image
   seed: 134, // seed for random generator
   colorFactor: 0.75, // darken the overall color
