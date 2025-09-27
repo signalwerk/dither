@@ -24,21 +24,13 @@ let ditherImg = []; // holds dithered img
 // scale the final image
 let ditherScale = config.upscaleFactor;
 let ditherScaleImg = []; // holds scaled img
+let autoRefreshInterval = null; // holds interval for auto-refresh
 
-function setup() {
+function generatePattern() {
   // reproducable function
   if (config.seed) {
     randomSeed(config.seed);
   }
-  pixelDensity(1);
-
-  var canvas = createCanvas(
-    canvasW * scale * ditherScale,
-    canvasH * scale * ditherScale,
-  );
-  // Move the canvas so it’s inside our <div id="sketch-holder">.
-  canvas.parent("sketch-holder");
-  background(0, 100, 200);
 
   // generate random noise 1x1
   for (let x = 0; x < canvasW; x++) {
@@ -86,6 +78,31 @@ function setup() {
   pixels.forEach((item, index) => (pixels[index] = ditherScaleImg[index]));
 
   updatePixels();
+}
+
+function setup() {
+  pixelDensity(1);
+
+  var canvas = createCanvas(
+    canvasW * scale * ditherScale,
+    canvasH * scale * ditherScale,
+  );
+  // Move the canvas so it's inside our <div id="sketch-holder">.
+  canvas.parent("sketch-holder");
+  background(0, 100, 200);
+
+  // Generate initial pattern
+  generatePattern();
+
+  // Check if autorefresh parameter is in URL
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.has("autorefresh")) {
+    // Set up auto-refresh
+    autoRefreshInterval = setInterval(() => {
+      generatePattern();
+    }, 1000);
+  }
+
   noLoop();
 }
 
