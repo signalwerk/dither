@@ -97,6 +97,9 @@ function setup() {
   // Check if autorefresh parameter is in URL
   const urlParams = new URLSearchParams(window.location.search);
   if (urlParams.has("autorefresh")) {
+    // Hide the instructions when autorefresh is active
+    document.getElementById("instructions").style.display = "none";
+    
     // Set up auto-refresh
     autoRefreshInterval = setInterval(() => {
       generatePattern();
