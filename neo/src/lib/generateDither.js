@@ -8,7 +8,7 @@ const LCG = (s) => {
 let rand = LCG(42);
 
 let getColor = () => {
-  return rand() * 255;
+  return rand() * 255 * 0.75;
 };
 
 let generateDither = ({ width, height, seed }) => {

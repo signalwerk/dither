@@ -119,6 +119,7 @@ function App() {
               height: `${config.height * 10}px`,
             }}
           />
+          <p>10× scaled</p>
         </div>
         <div>
           <h3>Dithered (B&amp;W)</h3>
