@@ -1,107 +1,135 @@
 import { useState, useEffect, useRef } from "react";
 import "./App.css";
 import generateDither from "./lib/generateDither";
+import { img8BitToRGBA, renderToCanvas } from "./lib/imageUtils";
+import applyDither from "./lib/applyDither";
 
 function App() {
   const [pattern, setPattern] = useState<number[]>([]);
   const [config, setConfig] = useState({
     width: 20,
     height: 40,
-    seed: 42
+    seed: 42,
+    scale: 12,
   });
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const canvasGrayRef = useRef<HTMLCanvasElement>(null);
+  const canvasDitherRef = useRef<HTMLCanvasElement>(null);
 
   const generatePattern = () => {
     const newPattern = generateDither({
       width: config.width,
       height: config.height,
-      seed: config.seed
+      seed: config.seed,
     });
     setPattern(newPattern);
   };
 
-  const drawPattern = () => {
-    if (!canvasRef.current || pattern.length === 0) return;
-
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const imageData = ctx.createImageData(config.width, config.height);
-    
-    for (let i = 0; i < pattern.length; i++) {
-      const value = Math.floor(pattern[i]);
-      const pixelIndex = i * 4;
-      imageData.data[pixelIndex] = value;     // R
-      imageData.data[pixelIndex + 1] = value; // G
-      imageData.data[pixelIndex + 2] = value; // B
-      imageData.data[pixelIndex + 3] = 255;   // A
-    }
-
-    ctx.putImageData(imageData, 0, 0);
-  };
-
   useEffect(() => {
-    generatePattern();
+    setPattern(
+      generateDither({ width: config.width, height: config.height, seed: config.seed })
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
-    drawPattern();
-  }, [pattern]);
+    if (pattern.length === 0) return;
+
+    if (canvasGrayRef.current) {
+      const rgba = img8BitToRGBA(pattern);
+      renderToCanvas(canvasGrayRef.current, rgba, config.width, config.height);
+    }
+
+    if (canvasDitherRef.current) {
+      const { pixels, width, height } = applyDither({
+        pixels: pattern,
+        width: config.width,
+        height: config.height,
+        scale: config.scale,
+      });
+      renderToCanvas(canvasDitherRef.current, pixels, width, height);
+    }
+  }, [pattern, config.width, config.height, config.scale]);
 
   return (
     <>
       <h1>Scarf</h1>
       <p>Pattern Generator</p>
-      
-      <div style={{ marginBottom: '20px' }}>
+
+      <div style={{ marginBottom: "20px" }}>
         <div>
           <label>
-            Width: 
-            <input 
-              type="number" 
-              value={config.width} 
-              onChange={(e) => setConfig(prev => ({ ...prev, width: parseInt(e.target.value) || 20 }))}
-              style={{ marginLeft: '10px', marginRight: '20px' }}
+            Width:
+            <input
+              type="number"
+              value={config.width}
+              onChange={(e) =>
+                setConfig((prev) => ({ ...prev, width: parseInt(e.target.value) || 20 }))
+              }
+              style={{ marginLeft: "10px", marginRight: "20px" }}
             />
           </label>
           <label>
-            Height: 
-            <input 
-              type="number" 
-              value={config.height} 
-              onChange={(e) => setConfig(prev => ({ ...prev, height: parseInt(e.target.value) || 40 }))}
-              style={{ marginLeft: '10px', marginRight: '20px' }}
+            Height:
+            <input
+              type="number"
+              value={config.height}
+              onChange={(e) =>
+                setConfig((prev) => ({ ...prev, height: parseInt(e.target.value) || 40 }))
+              }
+              style={{ marginLeft: "10px", marginRight: "20px" }}
             />
           </label>
           <label>
-            Seed: 
-            <input 
-              type="number" 
-              value={config.seed} 
-              onChange={(e) => setConfig(prev => ({ ...prev, seed: parseInt(e.target.value) || 42 }))}
-              style={{ marginLeft: '10px', marginRight: '20px' }}
+            Seed:
+            <input
+              type="number"
+              value={config.seed}
+              onChange={(e) =>
+                setConfig((prev) => ({ ...prev, seed: parseInt(e.target.value) || 42 }))
+              }
+              style={{ marginLeft: "10px", marginRight: "20px" }}
+            />
+          </label>
+          <label>
+            Scale:
+            <input
+              type="number"
+              value={config.scale}
+              onChange={(e) =>
+                setConfig((prev) => ({ ...prev, scale: parseInt(e.target.value) || 12 }))
+              }
+              style={{ marginLeft: "10px", marginRight: "20px" }}
             />
           </label>
         </div>
-        <button onClick={generatePattern} style={{ marginTop: '10px' }}>
+        <button onClick={generatePattern} style={{ marginTop: "10px" }}>
           Generate New Pattern
         </button>
       </div>
 
-      <div>
-        <canvas 
-          ref={canvasRef}
-          width={config.width}
-          height={config.height}
-          style={{ 
-            border: '1px solid #ccc',
-            imageRendering: 'pixelated',
-            width: `${config.width * 10}px`,
-            height: `${config.height * 10}px`
-          }}
-        />
-        <p>10× scaled</p>
+      <div style={{ display: "flex", gap: "40px", alignItems: "flex-start" }}>
+        <div>
+          <h3>Grayscale</h3>
+          <canvas
+            ref={canvasGrayRef}
+            style={{
+              border: "1px solid #ccc",
+              imageRendering: "pixelated",
+              width: `${config.width * 10}px`,
+              height: `${config.height * 10}px`,
+            }}
+          />
+        </div>
+        <div>
+          <h3>Dithered (B&amp;W)</h3>
+          <canvas
+            ref={canvasDitherRef}
+            style={{
+              border: "1px solid #ccc",
+              imageRendering: "pixelated",
+            }}
+          />
+        </div>
       </div>
     </>
   );

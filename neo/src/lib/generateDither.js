@@ -64,7 +64,7 @@ let pixelDrawer = ({ img, color, elementHeight, count, width, height }) => {
 
     for (let h = 0; h < elementH; h++) {
       let index = parseInt(yRand * width + width * h + xRand);
-      if (index <= width * height) {
+      if (index < width * height) {
         newPixel[index] = color;
       }
     }
