@@ -1,43 +1,102 @@
-const bezierEval = (p0, p1, p2, p3, t) => {
-  const mt = 1 - t;
-  const mt2 = mt * mt;
-  const t2 = t * t;
-  return {
-    x: mt2 * mt * p0.x + 3 * mt2 * t * p1.x + 3 * mt * t2 * p2.x + t2 * t * p3.x,
-    y: mt2 * mt * p0.y + 3 * mt2 * t * p1.y + 3 * mt * t2 * p2.y + t2 * t * p3.y,
-  };
+/**
+ * Solve for natural cubic spline coefficients.
+ * Given N sorted points, returns (N-1) sets of {a, b, c, d} such that
+ *   S_i(x) = a_i + b_i*(x - x_i) + c_i*(x - x_i)^2 + d_i*(x - x_i)^3
+ */
+const computeSpline = (pts) => {
+  const n = pts.length - 1;
+  if (n < 1) return [];
+
+  const h = new Float64Array(n);
+  const alpha = new Float64Array(n);
+  for (let i = 0; i < n; i++) h[i] = pts[i + 1].x - pts[i].x;
+  for (let i = 1; i < n; i++) {
+    alpha[i] =
+      (3 / h[i]) * (pts[i + 1].y - pts[i].y) -
+      (3 / h[i - 1]) * (pts[i].y - pts[i - 1].y);
+  }
+
+  const l = new Float64Array(n + 1);
+  const mu = new Float64Array(n + 1);
+  const z = new Float64Array(n + 1);
+  l[0] = 1;
+
+  for (let i = 1; i < n; i++) {
+    l[i] = 2 * (pts[i + 1].x - pts[i - 1].x) - h[i - 1] * mu[i - 1];
+    mu[i] = h[i] / l[i];
+    z[i] = (alpha[i] - h[i - 1] * z[i - 1]) / l[i];
+  }
+
+  l[n] = 1;
+  const c = new Float64Array(n + 1);
+  const b = new Float64Array(n);
+  const d = new Float64Array(n);
+
+  for (let j = n - 1; j >= 0; j--) {
+    c[j] = z[j] - mu[j] * c[j + 1];
+    b[j] = (pts[j + 1].y - pts[j].y) / h[j] - h[j] * (c[j + 1] + 2 * c[j]) / 3;
+    d[j] = (c[j + 1] - c[j]) / (3 * h[j]);
+  }
+
+  const segs = [];
+  for (let i = 0; i < n; i++) {
+    segs.push({ a: pts[i].y, b: b[i], c: c[i], d: d[i], x0: pts[i].x });
+  }
+  return segs;
+};
+
+const evalSpline = (segs, pts, x) => {
+  if (segs.length === 0) return pts.length ? pts[0].y : 0;
+  // Find the segment
+  let i = segs.length - 1;
+  for (let j = 0; j < segs.length; j++) {
+    if (x < pts[j + 1].x) {
+      i = j;
+      break;
+    }
+  }
+  const s = segs[i];
+  const dx = x - s.x0;
+  return s.a + s.b * dx + s.c * dx * dx + s.d * dx * dx * dx;
 };
 
 /**
- * Build a 256-entry LUT from 4 bezier control points in normalised [0,1] space.
- * Assumes the curve is monotone in X (x goes 0→1 across the parameter range).
+ * Build a 256-entry LUT from an array of {x,y} points using natural cubic spline.
  */
-export const buildBezierLUT = (p0, p1, p2, p3) => {
-  const N = 4096;
-  const xs = new Float32Array(N);
-  const ys = new Float32Array(N);
-
-  for (let i = 0; i < N; i++) {
-    const pt = bezierEval(p0, p1, p2, p3, i / (N - 1));
-    xs[i] = pt.x;
-    ys[i] = pt.y;
-  }
-
+export const buildSplineLUT = (points) => {
+  const sorted = [...points].sort((a, b) => a.x - b.x);
+  const segs = computeSpline(sorted);
   const lut = new Uint8Array(256);
+
   for (let v = 0; v < 256; v++) {
     const x = v / 255;
-    let lo = 0;
-    let hi = N - 1;
-    while (hi - lo > 1) {
-      const mid = (lo + hi) >>> 1;
-      if (xs[mid] <= x) lo = mid;
-      else hi = mid;
-    }
-    const dx = xs[hi] - xs[lo];
-    const f = dx < 1e-10 ? 0 : (x - xs[lo]) / dx;
-    lut[v] = Math.round(Math.max(0, Math.min(1, ys[lo] + f * (ys[hi] - ys[lo]))) * 255);
+    const y = evalSpline(segs, sorted, x);
+    lut[v] = Math.round(Math.max(0, Math.min(1, y)) * 255);
   }
   return lut;
+};
+
+/**
+ * Build an SVG path string for displaying the spline curve.
+ * Points are in normalised [0,1] coords; output is in SVG pixel coords
+ * with Y flipped (0=top).
+ */
+export const naturalCubicSplinePath = (points, size) => {
+  const sorted = [...points].sort((a, b) => a.x - b.x);
+  if (sorted.length < 2) return "";
+
+  const segs = computeSpline(sorted);
+  const steps = Math.max(200, size * 2);
+  const parts = [];
+
+  for (let i = 0; i <= steps; i++) {
+    const x = i / steps;
+    const y = evalSpline(segs, sorted, x);
+    const sx = (x * size).toFixed(1);
+    const sy = ((1 - Math.max(0, Math.min(1, y))) * size).toFixed(1);
+    parts.push(i === 0 ? `M ${sx} ${sy}` : `L ${sx} ${sy}`);
+  }
+  return parts.join(" ");
 };
 
 /**

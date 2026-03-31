@@ -3,8 +3,8 @@ import "./App.css";
 import generateDither from "./lib/generateDither";
 import { img8BitToRGBA, renderToCanvas } from "./lib/imageUtils";
 import applyDither from "./lib/applyDither";
-import { buildBezierLUT, applyColorCurve } from "./lib/applyColorCurve";
-import BezierCurveEditor, { type CurvePoints } from "./lib/BezierCurveEditor";
+import { buildSplineLUT, applyColorCurve } from "./lib/applyColorCurve";
+import CurveEditor, { type Point } from "./lib/BezierCurveEditor";
 import { DEFAULT_CURVE_POINTS } from "./lib/curveDefaults";
 
 function App() {
@@ -15,7 +15,7 @@ function App() {
     seed: 42,
     scale: 12,
   });
-  const [curvePoints, setCurvePoints] = useState<CurvePoints>(DEFAULT_CURVE_POINTS);
+  const [curvePoints, setCurvePoints] = useState<Point[]>(DEFAULT_CURVE_POINTS);
 
   const canvasGrayRef = useRef<HTMLCanvasElement>(null);
   const canvasCurvedRef = useRef<HTMLCanvasElement>(null);
@@ -39,7 +39,7 @@ function App() {
     }
 
     // 2. Curve-adjusted grayscale
-    const lut = buildBezierLUT(...curvePoints);
+    const lut = buildSplineLUT(curvePoints);
     const curved = applyColorCurve(pattern, lut);
 
     if (canvasCurvedRef.current) {
@@ -111,7 +111,7 @@ function App() {
         {/* Column 2 — Bezier curve editor + curve-adjusted preview */}
         <div>
           <h3>Colour Curve</h3>
-          <BezierCurveEditor points={curvePoints} onChange={setCurvePoints} />
+          <CurveEditor points={curvePoints} onChange={setCurvePoints} />
           <div style={{ marginTop: "16px" }}>
             <h3>Curve-adjusted</h3>
             <canvas ref={canvasCurvedRef} style={canvasStyle} />
