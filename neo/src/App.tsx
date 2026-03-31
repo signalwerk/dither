@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import "./App.css";
 import generateDither from "./lib/generateDither";
 import { img8BitToRGBA, renderToCanvas } from "./lib/imageUtils";
@@ -16,6 +16,9 @@ function App() {
     scale: 12,
   });
   const [curvePoints, setCurvePoints] = useState<Point[]>(DEFAULT_CURVE_POINTS);
+  // effectiveCurve is what the editor reports as the live preview (may exclude a pending-remove point)
+  const [effectiveCurve, setEffectiveCurve] = useState<Point[]>(DEFAULT_CURVE_POINTS);
+  const handlePreview = useCallback((pts: Point[]) => setEffectiveCurve(pts), []);
 
   const canvasGrayRef = useRef<HTMLCanvasElement>(null);
   const canvasCurvedRef = useRef<HTMLCanvasElement>(null);
@@ -38,8 +41,8 @@ function App() {
       renderToCanvas(canvasGrayRef.current, img8BitToRGBA(pattern), config.width, config.height);
     }
 
-    // 2. Curve-adjusted grayscale
-    const lut = buildSplineLUT(curvePoints);
+    // 2. Curve-adjusted grayscale (use effectiveCurve for live preview)
+    const lut = buildSplineLUT(effectiveCurve);
     const curved = applyColorCurve(pattern, lut);
 
     if (canvasCurvedRef.current) {
@@ -56,7 +59,7 @@ function App() {
       });
       renderToCanvas(canvasDitherRef.current, pixels, width, height);
     }
-  }, [pattern, curvePoints, config.width, config.height, config.scale]);
+  }, [pattern, effectiveCurve, config.width, config.height, config.scale]);
 
   const canvasStyle = {
     border: "1px solid #ccc",
@@ -111,7 +114,7 @@ function App() {
         {/* Column 2 — Bezier curve editor + curve-adjusted preview */}
         <div>
           <h3>Colour Curve</h3>
-          <CurveEditor points={curvePoints} onChange={setCurvePoints} />
+          <CurveEditor points={curvePoints} onChange={setCurvePoints} onPreview={handlePreview} />
           <div style={{ marginTop: "16px" }}>
             <h3>Curve-adjusted</h3>
             <canvas ref={canvasCurvedRef} style={canvasStyle} />

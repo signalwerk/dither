@@ -9,6 +9,9 @@ export interface Point {
 interface Props {
   points: Point[];
   onChange: (points: Point[]) => void;
+  /** Called during drag with the effective points for live output preview.
+   *  When not dragging, this equals `points`. */
+  onPreview?: (points: Point[]) => void;
   size?: number;
 }
 
@@ -20,24 +23,28 @@ const POINT_R = 6;
 const PAD = POINT_R + 2;
 const REMOVE_MARGIN = 40;
 
-export default function CurveEditor({ points, onChange, size = 220 }: Props) {
+export default function CurveEditor({ points, onChange, onPreview, size = 220 }: Props) {
   const svgRef = useRef<SVGSVGElement>(null);
   const dragging = useRef<number | null>(null);
   const selected = useRef<number | null>(null);
   const [pendingRemove, setPendingRemove] = useState<number | null>(null);
 
-  const canRemove = useCallback(
-    (idx: number) => idx > 0 && idx < points.length - 1 && points.length > 2,
-    [points.length],
-  );
+  const canRemove = (idx: number) =>
+    idx > 0 && idx < points.length - 1 && points.length > 2;
 
-  // Display points: exclude the pending-remove point for live preview
+  // Display/effective points: exclude the pending-remove point
   const displayPoints = useMemo(() => {
     if (pendingRemove !== null && canRemove(pendingRemove)) {
       return points.filter((_, i) => i !== pendingRemove);
     }
     return points;
-  }, [points, pendingRemove, canRemove]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [points, pendingRemove]);
+
+  // Notify parent of effective points whenever they change
+  useEffect(() => {
+    onPreview?.(displayPoints);
+  }, [displayPoints, onPreview]);
 
   // Convert normalised [0,1] → SVG px (Y flipped, with padding)
   const toSvg = (p: Point): [number, number] => [
@@ -110,13 +117,17 @@ export default function CurveEditor({ points, onChange, size = 220 }: Props) {
       const idx = dragging.current;
       const { nx, ny } = pointerToNorm(e);
 
-      // Live preview: if dragged outside, mark for removal
-      if (canRemove(idx) && isOutside(e)) {
+      // Interior point dragged outside → mark for removal preview
+      if (idx > 0 && idx < points.length - 1 && points.length > 2 && isOutside(e)) {
         setPendingRemove(idx);
         return;
       }
-      setPendingRemove(null);
+      // Dragged back inside → clear removal preview
+      if (pendingRemove !== null) {
+        setPendingRemove(null);
+      }
 
+      // Normal drag — update the point position
       const next = points.map((p) => ({ ...p }));
       const isFirst = idx === 0;
       const isLast = idx === points.length - 1;
@@ -134,13 +145,14 @@ export default function CurveEditor({ points, onChange, size = 220 }: Props) {
       }
       onChange(next);
     },
-    [points, onChange, pointerToNorm, isOutside, canRemove],
+    [points, onChange, pointerToNorm, isOutside, pendingRemove],
   );
 
   const onPointerUp = useCallback(() => {
     const idx = dragging.current;
     dragging.current = null;
 
+    // Finalize removal: commit filtered points to parent
     if (idx !== null && pendingRemove === idx && canRemove(idx)) {
       const next = points.filter((_, i) => i !== idx);
       selected.current = null;
@@ -148,8 +160,10 @@ export default function CurveEditor({ points, onChange, size = 220 }: Props) {
       onChange(next);
       return;
     }
+
     setPendingRemove(null);
-  }, [points, onChange, pendingRemove, canRemove]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [points, onChange, pendingRemove]);
 
   // Double-click → add a point
   const onDblClick = useCallback(
