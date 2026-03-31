@@ -62,15 +62,26 @@ const evalSpline = (segs, pts, x) => {
 
 /**
  * Build a 256-entry LUT from an array of {x,y} points using natural cubic spline.
+ * If the first point's x > 0 or last point's x < 1, the value is held flat to the edge.
  */
 export const buildSplineLUT = (points) => {
   const sorted = [...points].sort((a, b) => a.x - b.x);
   const segs = computeSpline(sorted);
   const lut = new Uint8Array(256);
 
+  const first = sorted[0];
+  const last = sorted[sorted.length - 1];
+
   for (let v = 0; v < 256; v++) {
     const x = v / 255;
-    const y = evalSpline(segs, sorted, x);
+    let y;
+    if (x <= first.x) {
+      y = first.y; // flat extension on the left
+    } else if (x >= last.x) {
+      y = last.y; // flat extension on the right
+    } else {
+      y = evalSpline(segs, sorted, x);
+    }
     lut[v] = Math.round(Math.max(0, Math.min(1, y)) * 255);
   }
   return lut;
@@ -79,21 +90,24 @@ export const buildSplineLUT = (points) => {
 /**
  * Build an SVG path string for displaying the spline curve.
  * Points are in normalised [0,1] coords; output is in SVG pixel coords
- * with Y flipped (0=top).
+ * with Y flipped (0=top). `pad` offsets everything so edge points aren't clipped.
+ * Only draws between the first and last point's x (flat extensions are separate).
  */
-export const naturalCubicSplinePath = (points, size) => {
+export const naturalCubicSplinePath = (points, size, pad = 8) => {
   const sorted = [...points].sort((a, b) => a.x - b.x);
   if (sorted.length < 2) return "";
 
   const segs = computeSpline(sorted);
+  const x0 = sorted[0].x;
+  const x1 = sorted[sorted.length - 1].x;
   const steps = Math.max(200, size * 2);
   const parts = [];
 
   for (let i = 0; i <= steps; i++) {
-    const x = i / steps;
+    const x = x0 + (x1 - x0) * (i / steps);
     const y = evalSpline(segs, sorted, x);
-    const sx = (x * size).toFixed(1);
-    const sy = ((1 - Math.max(0, Math.min(1, y))) * size).toFixed(1);
+    const sx = (pad + x * size).toFixed(1);
+    const sy = (pad + (1 - Math.max(0, Math.min(1, y))) * size).toFixed(1);
     parts.push(i === 0 ? `M ${sx} ${sy}` : `L ${sx} ${sy}`);
   }
   return parts.join(" ");

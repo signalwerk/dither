@@ -1,4 +1,4 @@
-import { useRef, useCallback, useEffect } from "react";
+import { useRef, useCallback, useEffect, useState, useMemo } from "react";
 import { naturalCubicSplinePath } from "./applyColorCurve";
 
 export interface Point {
@@ -16,32 +16,66 @@ function clamp(v: number, lo = 0, hi = 1) {
   return Math.max(lo, Math.min(hi, v));
 }
 
-const POINT_R = 5;
-const REMOVE_MARGIN = 40; // px outside the square to trigger removal
+const POINT_R = 6;
+const PAD = POINT_R + 2;
+const REMOVE_MARGIN = 40;
 
 export default function CurveEditor({ points, onChange, size = 220 }: Props) {
   const svgRef = useRef<SVGSVGElement>(null);
   const dragging = useRef<number | null>(null);
   const selected = useRef<number | null>(null);
+  const [pendingRemove, setPendingRemove] = useState<number | null>(null);
 
-  // Convert normalised [0,1] coords → SVG px (Y flipped)
-  const toSvg = (p: Point): [number, number] => [p.x * size, (1 - p.y) * size];
+  const canRemove = useCallback(
+    (idx: number) => idx > 0 && idx < points.length - 1 && points.length > 2,
+    [points.length],
+  );
 
-  // Build the spline SVG path
-  const svgPts = points.map(toSvg);
-  const pathD = naturalCubicSplinePath(points, size);
+  // Display points: exclude the pending-remove point for live preview
+  const displayPoints = useMemo(() => {
+    if (pendingRemove !== null && canRemove(pendingRemove)) {
+      return points.filter((_, i) => i !== pendingRemove);
+    }
+    return points;
+  }, [points, pendingRemove, canRemove]);
 
-  // --- pointer handlers ---
+  // Convert normalised [0,1] → SVG px (Y flipped, with padding)
+  const toSvg = (p: Point): [number, number] => [
+    PAD + p.x * size,
+    PAD + (1 - p.y) * size,
+  ];
+
+  const svgPts = displayPoints.map(toSvg);
+  const pathD = naturalCubicSplinePath(displayPoints, size, PAD);
+
+  // Flat-extension paths for endpoints dragged inward
+  const first = displayPoints[0];
+  const last = displayPoints[displayPoints.length - 1];
+
+  const leftExt =
+    first.x > 0.001
+      ? `M ${PAD} ${PAD + (1 - first.y) * size} L ${PAD + first.x * size} ${PAD + (1 - first.y) * size}`
+      : null;
+  const rightExt =
+    last.x < 0.999
+      ? `M ${PAD + last.x * size} ${PAD + (1 - last.y) * size} L ${PAD + size} ${PAD + (1 - last.y) * size}`
+      : null;
+
+  // --- coordinate helpers ---
 
   const pointerToNorm = useCallback(
-    (e: React.PointerEvent | PointerEvent) => {
+    (e: React.PointerEvent | PointerEvent | React.MouseEvent) => {
       const rect = svgRef.current!.getBoundingClientRect();
+      const graphLeft = rect.left + (PAD / (size + PAD * 2)) * rect.width;
+      const graphTop = rect.top + (PAD / (size + PAD * 2)) * rect.height;
+      const graphW = (size / (size + PAD * 2)) * rect.width;
+      const graphH = (size / (size + PAD * 2)) * rect.height;
       return {
-        nx: (e.clientX - rect.left) / rect.width,
-        ny: 1 - (e.clientY - rect.top) / rect.height,
+        nx: (e.clientX - graphLeft) / graphW,
+        ny: 1 - (e.clientY - graphTop) / graphH,
       };
     },
-    [],
+    [size],
   );
 
   const isOutside = useCallback(
@@ -57,12 +91,15 @@ export default function CurveEditor({ points, onChange, size = 220 }: Props) {
     [],
   );
 
+  // --- pointer handlers ---
+
   const onPointDown = useCallback(
     (e: React.PointerEvent<SVGCircleElement>, idx: number) => {
       e.stopPropagation();
       svgRef.current!.setPointerCapture(e.pointerId);
       dragging.current = idx;
       selected.current = idx;
+      setPendingRemove(null);
     },
     [],
   );
@@ -73,66 +110,65 @@ export default function CurveEditor({ points, onChange, size = 220 }: Props) {
       const idx = dragging.current;
       const { nx, ny } = pointerToNorm(e);
 
+      // Live preview: if dragged outside, mark for removal
+      if (canRemove(idx) && isOutside(e)) {
+        setPendingRemove(idx);
+        return;
+      }
+      setPendingRemove(null);
+
       const next = points.map((p) => ({ ...p }));
       const isFirst = idx === 0;
       const isLast = idx === points.length - 1;
 
-      // First and last points: X stays fixed at 0 / 1, Y is free
       if (isFirst) {
-        next[0] = { x: 0, y: clamp(ny) };
+        const xMax = points.length > 1 ? points[1].x - 0.005 : 1;
+        next[0] = { x: clamp(nx, 0, xMax), y: clamp(ny) };
       } else if (isLast) {
-        next[idx] = { x: 1, y: clamp(ny) };
+        const xMin = points.length > 1 ? points[idx - 1].x + 0.005 : 0;
+        next[idx] = { x: clamp(nx, xMin, 1), y: clamp(ny) };
       } else {
-        // Interior points: clamp X between neighbours
         const xMin = next[idx - 1].x + 0.005;
         const xMax = next[idx + 1].x - 0.005;
         next[idx] = { x: clamp(nx, xMin, xMax), y: clamp(ny) };
       }
       onChange(next);
     },
-    [points, onChange, pointerToNorm],
+    [points, onChange, pointerToNorm, isOutside, canRemove],
   );
 
-  const onPointerUp = useCallback(
-    (e: React.PointerEvent<SVGSVGElement>) => {
-      const idx = dragging.current;
-      dragging.current = null;
+  const onPointerUp = useCallback(() => {
+    const idx = dragging.current;
+    dragging.current = null;
 
-      // Remove if dragged outside, but keep at least 2 points, and never remove endpoints
-      if (
-        idx !== null &&
-        idx > 0 &&
-        idx < points.length - 1 &&
-        points.length > 2 &&
-        isOutside(e)
-      ) {
-        const next = points.filter((_, i) => i !== idx);
-        selected.current = null;
-        onChange(next);
-      }
-    },
-    [points, onChange, isOutside],
-  );
+    if (idx !== null && pendingRemove === idx && canRemove(idx)) {
+      const next = points.filter((_, i) => i !== idx);
+      selected.current = null;
+      setPendingRemove(null);
+      onChange(next);
+      return;
+    }
+    setPendingRemove(null);
+  }, [points, onChange, pendingRemove, canRemove]);
 
-  // Double-click on background → add a point
+  // Double-click → add a point
   const onDblClick = useCallback(
     (e: React.MouseEvent<SVGSVGElement>) => {
-      const rect = svgRef.current!.getBoundingClientRect();
-      const nx = clamp((e.clientX - rect.left) / rect.width);
-      const ny = clamp(1 - (e.clientY - rect.top) / rect.height);
+      const { nx, ny } = pointerToNorm(e);
+      const cx = clamp(nx);
+      const cy = clamp(ny);
 
-      // Insert sorted by x
-      const insertIdx = points.findIndex((p) => p.x > nx);
+      const insertIdx = points.findIndex((p) => p.x > cx);
       const next = [...points];
       if (insertIdx === -1) {
-        next.push({ x: nx, y: ny }); // shouldn't happen but just in case
+        next.push({ x: cx, y: cy });
       } else {
-        next.splice(insertIdx, 0, { x: nx, y: ny });
+        next.splice(insertIdx, 0, { x: cx, y: cy });
       }
       selected.current = insertIdx === -1 ? next.length - 1 : insertIdx;
       onChange(next);
     },
-    [points, onChange],
+    [points, onChange, pointerToNorm],
   );
 
   // Keyboard: Delete / Backspace removes selected interior point
@@ -153,20 +189,18 @@ export default function CurveEditor({ points, onChange, size = 220 }: Props) {
   }, [points, onChange]);
 
   const gridValues = [0.25, 0.5, 0.75];
+  const totalSize = size + PAD * 2;
 
   return (
     <div style={{ userSelect: "none" }}>
       <svg
         ref={svgRef}
-        width={size}
-        height={size}
-        viewBox={`0 0 ${size} ${size}`}
+        width={totalSize}
+        height={totalSize}
+        viewBox={`0 0 ${totalSize} ${totalSize}`}
         tabIndex={0}
         style={{
           display: "block",
-          background: "#111",
-          border: "1px solid #444",
-          borderRadius: 4,
           cursor: "crosshair",
           outline: "none",
         }}
@@ -174,26 +208,36 @@ export default function CurveEditor({ points, onChange, size = 220 }: Props) {
         onPointerUp={onPointerUp}
         onDoubleClick={onDblClick}
       >
+        {/* Graph background */}
+        <rect x={PAD} y={PAD} width={size} height={size} fill="#111" stroke="#444" strokeWidth={1} rx={2} />
+
         {/* Grid */}
         {gridValues.map((v) => (
           <g key={v}>
-            <line x1={v * size} y1={0} x2={v * size} y2={size} stroke="#222" strokeWidth={1} />
-            <line x1={0} y1={v * size} x2={size} y2={v * size} stroke="#222" strokeWidth={1} />
+            <line x1={PAD + v * size} y1={PAD} x2={PAD + v * size} y2={PAD + size} stroke="#222" strokeWidth={1} />
+            <line x1={PAD} y1={PAD + v * size} x2={PAD + size} y2={PAD + v * size} stroke="#222" strokeWidth={1} />
           </g>
         ))}
 
         {/* Identity diagonal */}
         <line
-          x1={0} y1={size} x2={size} y2={0}
+          x1={PAD} y1={PAD + size} x2={PAD + size} y2={PAD}
           stroke="#333" strokeWidth={1} strokeDasharray="4 4"
         />
+
+        {/* Flat extensions for endpoints dragged inward */}
+        {leftExt && (
+          <path d={leftExt} fill="none" stroke="#fff" strokeWidth={1.5} strokeDasharray="3 3" />
+        )}
+        {rightExt && (
+          <path d={rightExt} fill="none" stroke="#fff" strokeWidth={1.5} strokeDasharray="3 3" />
+        )}
 
         {/* Spline curve */}
         <path d={pathD} fill="none" stroke="#fff" strokeWidth={1.5} />
 
         {/* Control points */}
         {svgPts.map(([cx, cy], idx) => {
-          const isEnd = idx === 0 || idx === points.length - 1;
           const isSel = selected.current === idx;
           return (
             <circle
@@ -201,7 +245,7 @@ export default function CurveEditor({ points, onChange, size = 220 }: Props) {
               cx={cx}
               cy={cy}
               r={POINT_R}
-              fill={isSel ? "#f80" : isEnd ? "#48f" : "#48f"}
+              fill={isSel ? "#f80" : "#48f"}
               stroke={isSel ? "#fff" : "#ccc"}
               strokeWidth={isSel ? 2 : 1}
               style={{ cursor: "move" }}
@@ -211,11 +255,11 @@ export default function CurveEditor({ points, onChange, size = 220 }: Props) {
         })}
 
         {/* Axis labels */}
-        <text x={2} y={size - 3} fontSize={9} fill="#555">0</text>
-        <text x={size - 8} y={size - 3} fontSize={9} fill="#555">1</text>
-        <text x={2} y={10} fontSize={9} fill="#555">1</text>
+        <text x={PAD + 2} y={PAD + size - 3} fontSize={9} fill="#555">0</text>
+        <text x={PAD + size - 8} y={PAD + size - 3} fontSize={9} fill="#555">1</text>
+        <text x={PAD + 2} y={PAD + 10} fontSize={9} fill="#555">1</text>
       </svg>
-      <div style={{ fontSize: 11, color: "#666", marginTop: 4 }}>
+      <div style={{ fontSize: 11, color: "#666", marginTop: 2 }}>
         Double-click to add · Drag outside to remove · Del to delete selected
       </div>
     </div>
