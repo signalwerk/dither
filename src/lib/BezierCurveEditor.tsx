@@ -421,6 +421,17 @@ export default function CurveEditor({
           </g>
         ))}
 
+        {/* Axis labels */}
+        <text x={PAD + 2} y={PAD + size - 3} fontSize={9} fill="#555">
+          0
+        </text>
+        <text x={PAD + size - 18} y={PAD + size - 3} fontSize={9} fill="#555">
+          100
+        </text>
+        <text x={PAD + 2} y={PAD + 10} fontSize={9} fill="#555">
+          100
+        </text>
+
         {/* Identity diagonal */}
         <line
           x1={PAD}
@@ -473,17 +484,6 @@ export default function CurveEditor({
             />
           );
         })}
-
-        {/* Axis labels */}
-        <text x={PAD + 2} y={PAD + size - 3} fontSize={9} fill="#555">
-          0
-        </text>
-        <text x={PAD + size - 18} y={PAD + size - 3} fontSize={9} fill="#555">
-          100
-        </text>
-        <text x={PAD + 2} y={PAD + 10} fontSize={9} fill="#555">
-          100
-        </text>
       </svg>
       <div style={{ display: "flex", gap: "12px", marginTop: "10px" }}>
         <label>
