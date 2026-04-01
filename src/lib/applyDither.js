@@ -19,7 +19,7 @@ const applyDither = ({ pixels, width, height, scale = 12 }) => {
   const scaled8 = scaleGrayscale(pixels, width, height, scale);
   const scaledRGBA = img8BitToRGBA(Array.from(scaled8));
 
-  // 2. Feed into image-q exactly like the original
+  // 2. Feed into image-q
   const pointContainer = utils.PointContainer.fromUint8Array(
     scaledRGBA,
     scaledW,

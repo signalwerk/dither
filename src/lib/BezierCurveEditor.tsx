@@ -25,6 +25,12 @@ const REMOVE_MARGIN = 40;
 const MIN_GAP = 0.005;
 
 const formatPercent = (value: number) => Number((value * 100).toFixed(2)).toString();
+const nudgeToIntegerPercent = (value: number, direction: -1 | 1) => {
+  const percent = value * 100;
+  const nextPercent =
+    direction > 0 ? Math.floor(percent + Number.EPSILON) + 1 : Math.ceil(percent - Number.EPSILON) - 1;
+  return nextPercent / 100;
+};
 
 export default function CurveEditor({ points, onChange, onPreview, size = 220 }: Props) {
   const svgRef = useRef<SVGSVGElement>(null);
@@ -33,6 +39,7 @@ export default function CurveEditor({ points, onChange, onPreview, size = 220 }:
   const [selectedIndex, setSelectedIndex] = useState<number | null>(0);
   const [inputDraft, setInputDraft] = useState("");
   const [outputDraft, setOutputDraft] = useState("");
+  const [editingAxis, setEditingAxis] = useState<"x" | "y" | null>(null);
 
   const canRemove = (idx: number) =>
     idx > 0 && idx < points.length - 1 && points.length > 2;
@@ -63,6 +70,12 @@ export default function CurveEditor({ points, onChange, onPreview, size = 220 }:
     [clampPoint, onChange, points],
   );
 
+  const isTypingTarget = (target: EventTarget | null) =>
+    target instanceof HTMLInputElement ||
+    target instanceof HTMLTextAreaElement ||
+    target instanceof HTMLSelectElement ||
+    (target instanceof HTMLElement && target.isContentEditable);
+
   // Display/effective points: exclude the pending-remove point
   const displayEntries = useMemo(() => {
     if (pendingRemove !== null && canRemove(pendingRemove)) {
@@ -92,15 +105,23 @@ export default function CurveEditor({ points, onChange, onPreview, size = 220 }:
   }, [points, selectedIndex]);
 
   useEffect(() => {
+    setEditingAxis(null);
+  }, [selectedIndex]);
+
+  useEffect(() => {
     if (selectedIndex === null || !points[selectedIndex]) {
       setInputDraft("");
       setOutputDraft("");
       return;
     }
 
-    setInputDraft(formatPercent(points[selectedIndex].x));
-    setOutputDraft(formatPercent(points[selectedIndex].y));
-  }, [points, selectedIndex]);
+    if (editingAxis !== "x") {
+      setInputDraft(formatPercent(points[selectedIndex].x));
+    }
+    if (editingAxis !== "y") {
+      setOutputDraft(formatPercent(points[selectedIndex].y));
+    }
+  }, [editingAxis, points, selectedIndex]);
 
   // Convert normalised [0,1] → SVG px (Y flipped, with padding)
   const toSvg = (p: Point): [number, number] => [
@@ -229,9 +250,34 @@ export default function CurveEditor({ points, onChange, onPreview, size = 220 }:
   // Keyboard: Delete / Backspace removes selected interior point
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      if (isTypingTarget(e.target)) return;
+
       const idx = selectedIndex;
-      if (idx === null || idx === 0 || idx === points.length - 1) return;
+      if (idx === null || !points[idx]) return;
+
+      if (e.key.startsWith("Arrow")) {
+        e.preventDefault();
+        const nextPoint = { ...points[idx] };
+
+        if (e.key === "ArrowLeft") {
+          nextPoint.x = nudgeToIntegerPercent(nextPoint.x, -1);
+        } else if (e.key === "ArrowRight") {
+          nextPoint.x = nudgeToIntegerPercent(nextPoint.x, 1);
+        } else if (e.key === "ArrowUp") {
+          nextPoint.y = nudgeToIntegerPercent(nextPoint.y, 1);
+        } else if (e.key === "ArrowDown") {
+          nextPoint.y = nudgeToIntegerPercent(nextPoint.y, -1);
+        } else {
+          return;
+        }
+
+        updatePoint(idx, nextPoint);
+        return;
+      }
+
+      if (idx === 0 || idx === points.length - 1) return;
       if (points.length <= 2) return;
+
       if (e.key === "Delete" || e.key === "Backspace") {
         e.preventDefault();
         const next = points.filter((_, i) => i !== idx);
@@ -241,7 +287,7 @@ export default function CurveEditor({ points, onChange, onPreview, size = 220 }:
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [points, onChange, selectedIndex]);
+  }, [points, onChange, selectedIndex, updatePoint]);
 
   const selectedPoint = selectedIndex !== null ? points[selectedIndex] : null;
 
@@ -252,20 +298,66 @@ export default function CurveEditor({ points, onChange, onPreview, size = 220 }:
       } else {
         setOutputDraft(value);
       }
+    },
+    [],
+  );
 
-      if (selectedIndex === null) return;
+  const commitDraft = useCallback(
+    (axis: "x" | "y") => {
+      if (selectedIndex === null || !points[selectedIndex]) return;
 
-      const parsed = Number.parseFloat(value);
-      if (!Number.isFinite(parsed)) return;
+      const rawValue = axis === "x" ? inputDraft : outputDraft;
+      const parsed = Number.parseFloat(rawValue);
+      if (!Number.isFinite(parsed)) {
+        const currentValue = formatPercent(points[selectedIndex][axis]);
+        if (axis === "x") {
+          setInputDraft(currentValue);
+        } else {
+          setOutputDraft(currentValue);
+        }
+        return;
+      }
 
       const nextPoint = {
-        x: axis === "x" ? parsed / 100 : points[selectedIndex].x,
-        y: axis === "y" ? parsed / 100 : points[selectedIndex].y,
+        ...points[selectedIndex],
+        [axis]: parsed / 100,
       };
+      const clampedPoint = clampPoint(selectedIndex, nextPoint);
+
+      if (axis === "x") {
+        setInputDraft(formatPercent(clampedPoint.x));
+      } else {
+        setOutputDraft(formatPercent(clampedPoint.y));
+      }
 
       updatePoint(selectedIndex, nextPoint);
     },
-    [points, selectedIndex, updatePoint],
+    [clampPoint, inputDraft, outputDraft, points, selectedIndex, updatePoint],
+  );
+
+  const handleDraftKeyDown = useCallback(
+    (axis: "x" | "y", e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === "Enter") {
+        commitDraft(axis);
+        setEditingAxis(null);
+        e.currentTarget.blur();
+        return;
+      }
+
+      if (e.key === "Escape") {
+        if (selectedIndex !== null && points[selectedIndex]) {
+          const currentValue = formatPercent(points[selectedIndex][axis]);
+          if (axis === "x") {
+            setInputDraft(currentValue);
+          } else {
+            setOutputDraft(currentValue);
+          }
+        }
+        setEditingAxis(null);
+        e.currentTarget.blur();
+      }
+    },
+    [commitDraft, points, selectedIndex],
   );
 
   const gridValues = [0.25, 0.5, 0.75];
@@ -344,26 +436,34 @@ export default function CurveEditor({ points, onChange, onPreview, size = 220 }:
         <label>
           In:
           <input
-            type="number"
-            min={0}
-            max={100}
-            step={0.01}
+            type="text"
+            inputMode="decimal"
             value={inputDraft}
             disabled={!selectedPoint}
             onChange={(e) => handleDraftChange("x", e.target.value)}
+            onFocus={() => setEditingAxis("x")}
+            onBlur={() => {
+              commitDraft("x");
+              setEditingAxis(null);
+            }}
+            onKeyDown={(e) => handleDraftKeyDown("x", e)}
             style={{ marginLeft: "6px", width: "72px" }}
           />
         </label>
         <label>
           Out:
           <input
-            type="number"
-            min={0}
-            max={100}
-            step={0.01}
+            type="text"
+            inputMode="decimal"
             value={outputDraft}
             disabled={!selectedPoint}
             onChange={(e) => handleDraftChange("y", e.target.value)}
+            onFocus={() => setEditingAxis("y")}
+            onBlur={() => {
+              commitDraft("y");
+              setEditingAxis(null);
+            }}
+            onKeyDown={(e) => handleDraftKeyDown("y", e)}
             style={{ marginLeft: "6px", width: "72px" }}
           />
         </label>
