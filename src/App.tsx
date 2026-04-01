@@ -23,13 +23,17 @@ const parsePositiveInt = (value: string | null, fallback: number) => {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 };
 
+const normalizeCurveValue = (value: number) => (value > 1 ? value / 100 : value);
+
+const formatCurveValue = (value: number) => Number((value * 100).toFixed(2)).toString();
+
 const parseCurve = (value: string | null) => {
   if (!value) return DEFAULT_CURVE_POINTS;
 
   const points = value
-    .split(";")
+    .split("--")
     .map((segment) => {
-      const [rawX, rawY] = segment.split(",");
+      const [rawX, rawY] = segment.split("-", 2)
       const x = Number.parseFloat(rawX);
       const y = Number.parseFloat(rawY);
 
@@ -38,8 +42,8 @@ const parseCurve = (value: string | null) => {
       }
 
       return {
-        x: Math.max(0, Math.min(1, x)),
-        y: Math.max(0, Math.min(1, y)),
+        x: Math.max(0, Math.min(1, normalizeCurveValue(x))),
+        y: Math.max(0, Math.min(1, normalizeCurveValue(y))),
       };
     })
     .filter((point): point is Point => point !== null)
@@ -78,7 +82,7 @@ const writeStateToUrl = (config: Config, curvePoints: Point[]) => {
   params.set("scale", String(config.scale));
   params.set(
     "curve",
-    curvePoints.map(({ x, y }) => `${x.toFixed(4)},${y.toFixed(4)}`).join(";"),
+    curvePoints.map(({ x, y }) => `${formatCurveValue(x)}-${formatCurveValue(y)}`).join("--"),
   );
 
   const search = params.toString();
