@@ -1,18 +1,44 @@
-const LCG = (s) => {
-  return () => {
-    s = Math.imul(48271, s) | 0 % 2147483647;
-    return (s & 2147483647) / 2147483648;
-  };
+const RANDOM_MODULUS = 4294967296;
+const RANDOM_MULTIPLIER = 1664525;
+const RANDOM_INCREMENT = 1013904223;
+
+let randomState = 42;
+
+const setSeed = (seed) => {
+  randomState = (seed == null ? Math.random() * RANDOM_MODULUS : seed) >>> 0;
 };
 
-let rand = LCG(42);
+const lcg = () => {
+  randomState = (RANDOM_MULTIPLIER * randomState + RANDOM_INCREMENT) % RANDOM_MODULUS;
+  return randomState / RANDOM_MODULUS;
+};
 
-let getColor = () => {
-  return rand() * 255;
+const random = (min, max) => {
+  const rand = lcg();
+
+  if (typeof min === "undefined") {
+    return rand;
+  }
+
+  if (typeof max === "undefined") {
+    return rand * min;
+  }
+
+  if (min > max) {
+    const tmp = min;
+    min = max;
+    max = tmp;
+  }
+
+  return rand * (max - min) + min;
+};
+
+const getColor = () => {
+  return random(255);
 };
 
 let generateDither = ({ width, height, seed }) => {
-  rand = LCG(seed);
+  setSeed(seed);
   let newPixel = [];
 
   // generate random noise
@@ -54,8 +80,8 @@ let pixelDrawer = ({ img, color, elementHeight, count, width, height }) => {
     // Pick a random x, y
 
     let elementH = elementHeight;
-    let xRand = rand() * width;
-    let yRand = rand() * (height + elementH) - elementH;
+    let xRand = random(width);
+    let yRand = random(height + elementH) - elementH;
 
     if (yRand < 0) {
       elementH = elementHeight + yRand;
