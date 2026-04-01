@@ -228,11 +228,11 @@ function App() {
 
         {/* Column 2 - Bezier curve editor + curve-adjusted preview */}
         <div>
-          <h3>Colour Curve</h3>
-          <CurveEditor points={curvePoints} onChange={setCurvePoints} onPreview={handlePreview} />
+          <h3>Curve-adjusted</h3>
+          <canvas ref={canvasCurvedRef} style={canvasStyle} />
           <div style={{ marginTop: "16px" }}>
-            <h3>Curve-adjusted</h3>
-            <canvas ref={canvasCurvedRef} style={canvasStyle} />
+            <h3>Colour Curve</h3>
+            <CurveEditor points={curvePoints} onChange={setCurvePoints} onPreview={handlePreview} />
           </div>
         </div>
 
