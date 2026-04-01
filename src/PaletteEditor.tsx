@@ -1,5 +1,16 @@
 import { useState } from "react";
 import {
+  DndContext,
+  PointerSensor,
+  type DragEndEvent,
+  type DragStartEvent,
+  useDraggable,
+  useDroppable,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import { CSS } from "@dnd-kit/utilities";
+import {
   PREDEFINED_COLORS,
   normalizeHexColor,
   normalizePalette,
@@ -8,6 +19,19 @@ import {
 type PaletteEditorProps = {
   palette: string[];
   onChange: (palette: string[]) => void;
+};
+
+type PaletteRowProps = {
+  color: string;
+  index: number;
+  isActive: boolean;
+  onUpdateColor: (index: number, color: string) => void;
+  onRemoveColor: (index: number) => void;
+};
+
+type DropSlotProps = {
+  index: number;
+  isVisible: boolean;
 };
 
 const movePaletteColor = (
@@ -21,8 +45,115 @@ const movePaletteColor = (
   return nextPalette;
 };
 
+const getDragIndex = (id: string | null) => {
+  if (!id?.startsWith("color-")) {
+    return null;
+  }
+
+  const index = Number.parseInt(id.slice(6), 10);
+  return Number.isNaN(index) ? null : index;
+};
+
+const getSlotIndex = (id: string | null) => {
+  if (!id?.startsWith("slot-")) {
+    return null;
+  }
+
+  const index = Number.parseInt(id.slice(5), 10);
+  return Number.isNaN(index) ? null : index;
+};
+
+const getInsertionIndex = (dragIndex: number, slotIndex: number) =>
+  slotIndex > dragIndex ? slotIndex - 1 : slotIndex;
+
+function DropSlot({ index, isVisible }: DropSlotProps) {
+  const { setNodeRef } = useDroppable({
+    id: `slot-${index}`,
+  });
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={`palette-editor__drop-slot${isVisible ? " is-visible" : ""}`}
+      aria-hidden="true"
+    >
+      <span className="palette-editor__drop-line" />
+    </div>
+  );
+}
+
+function PaletteRow({
+  color,
+  index,
+  isActive,
+  onUpdateColor,
+  onRemoveColor,
+}: PaletteRowProps) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } =
+    useDraggable({
+      id: `color-${index}`,
+    });
+
+  const style = {
+    transform: CSS.Translate.toString(transform),
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`palette-editor__row${isDragging || isActive ? " is-dragging" : ""}`}
+    >
+      <button
+        type="button"
+        className="palette-editor__handle"
+        aria-label={`Drag palette colour ${index + 1}`}
+        {...listeners}
+        {...attributes}
+      >
+        <span />
+        <span />
+        <span />
+      </button>
+
+      <input
+        aria-label={`Palette color ${index + 1}`}
+        className="palette-editor__picker"
+        type="color"
+        value={color}
+        onChange={(event) => onUpdateColor(index, event.target.value)}
+      />
+
+      <div className="palette-editor__meta">
+        <span>Stop {index + 1}</span>
+        <code>{color}</code>
+      </div>
+
+      <div className="palette-editor__row-actions">
+        <span className="palette-editor__drag-hint">Drag handle to reorder</span>
+        <button
+          type="button"
+          className="button button--ghost"
+          onClick={() => onRemoveColor(index)}
+        >
+          Remove
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function PaletteEditor({ palette, onChange }: PaletteEditorProps) {
   const [customColor, setCustomColor] = useState("#e4e4db");
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [overSlotIndex, setOverSlotIndex] = useState<number | null>(null);
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 6,
+      },
+    }),
+  );
 
   const updateColor = (index: number, nextColor: string) => {
     const nextPalette = [...palette];
@@ -38,22 +169,35 @@ function PaletteEditor({ palette, onChange }: PaletteEditorProps) {
     onChange(palette.filter((_, paletteIndex) => paletteIndex !== index));
   };
 
-  const moveColor = (index: number, direction: -1 | 1) => {
-    const nextIndex = index + direction;
-
-    if (nextIndex < 0 || nextIndex >= palette.length) {
-      return;
-    }
-
-    onChange(movePaletteColor(palette, index, nextIndex));
-  };
-
   const addCustomColor = () => {
     onChange([...palette, normalizeHexColor(customColor)]);
   };
 
   const addPresetColor = (color: string) => {
     onChange([...palette, normalizeHexColor(color)]);
+  };
+
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveId(String(event.active.id));
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const dragIndex = getDragIndex(activeId);
+    const slotIndex = getSlotIndex(event.over ? String(event.over.id) : null);
+
+    setActiveId(null);
+    setOverSlotIndex(null);
+
+    if (dragIndex === null || slotIndex === null) {
+      return;
+    }
+
+    const insertionIndex = getInsertionIndex(dragIndex, slotIndex);
+    if (insertionIndex === dragIndex) {
+      return;
+    }
+
+    onChange(movePaletteColor(palette, dragIndex, insertionIndex));
   };
 
   return (
@@ -66,51 +210,40 @@ function PaletteEditor({ palette, onChange }: PaletteEditorProps) {
         </p>
       </div>
 
-      <div className="palette-editor__list">
-        {palette.map((color, index) => (
-          <div className="palette-editor__row" key={`${color}-${index}`}>
-            <input
-              aria-label={`Palette color ${index + 1}`}
-              className="palette-editor__picker"
-              type="color"
-              value={color}
-              onChange={(event) => updateColor(index, event.target.value)}
-            />
-
-            <div className="palette-editor__meta">
-              <span>Stop {index + 1}</span>
-              <code>{color}</code>
+      <DndContext
+        sensors={sensors}
+        onDragStart={handleDragStart}
+        onDragMove={(event) =>
+          setOverSlotIndex(getSlotIndex(event.over ? String(event.over.id) : null))
+        }
+        onDragOver={(event) =>
+          setOverSlotIndex(getSlotIndex(event.over ? String(event.over.id) : null))
+        }
+        onDragCancel={() => {
+          setActiveId(null);
+          setOverSlotIndex(null);
+        }}
+        onDragEnd={handleDragEnd}
+      >
+        <div className="palette-editor__list">
+          {palette.map((color, index) => (
+            <div key={`${color}-${index}`}>
+              <DropSlot index={index} isVisible={overSlotIndex === index} />
+              <PaletteRow
+                color={color}
+                index={index}
+                isActive={activeId === `color-${index}`}
+                onUpdateColor={updateColor}
+                onRemoveColor={removeColor}
+              />
             </div>
-
-            <div className="palette-editor__row-actions">
-              <button
-                type="button"
-                className="button button--secondary"
-                onClick={() => moveColor(index, -1)}
-                disabled={index === 0}
-              >
-                Move left
-              </button>
-              <button
-                type="button"
-                className="button button--secondary"
-                onClick={() => moveColor(index, 1)}
-                disabled={index === palette.length - 1}
-              >
-                Move right
-              </button>
-              <button
-                type="button"
-                className="button button--ghost"
-                onClick={() => removeColor(index)}
-                disabled={palette.length <= 2}
-              >
-                Remove
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
+          ))}
+          <DropSlot
+            index={palette.length}
+            isVisible={overSlotIndex === palette.length}
+          />
+        </div>
+      </DndContext>
 
       <div className="palette-editor__adders">
         <div className="palette-editor__adder">

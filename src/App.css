@@ -96,10 +96,15 @@
   align-items: start;
 }
 
+.palette-layout__stack {
+  display: grid;
+  gap: 1.25rem;
+}
+
 .gradient-canvas {
   display: block;
   width: 100%;
-  border-radius: 1rem;
+  border-radius: 0;
   border: 1px solid var(--line);
   background: #fffdf8;
   image-rendering: pixelated;
@@ -125,7 +130,7 @@
   align-items: center;
   gap: 0.55rem;
   padding: 0.45rem 0.7rem;
-  border-radius: 999px;
+  border-radius: 0;
   background: var(--bg-soft);
   border: 1px solid var(--line);
 }
@@ -144,18 +149,70 @@
 
 .palette-editor__list {
   display: grid;
-  gap: 0.8rem;
+  gap: 0;
+}
+
+.palette-editor__drop-slot {
+  display: flex;
+  align-items: center;
+  height: 12px;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.palette-editor__drop-slot.is-visible {
+  opacity: 1;
+}
+
+.palette-editor__drop-line {
+  display: block;
+  width: 100%;
+  height: 3px;
+  background: #000;
 }
 
 .palette-editor__row {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
   gap: 0.9rem;
   align-items: center;
   padding: 0.9rem;
   border: 1px solid var(--line);
   border-radius: 1rem;
   background: var(--bg-soft);
+  margin: 0.4rem 0;
+}
+
+.palette-editor__row.is-dragging {
+  opacity: 0.55;
+  transform: scale(0.99);
+}
+
+.palette-editor__handle {
+  display: grid;
+  gap: 0.18rem;
+  padding: 0.55rem 0.45rem;
+  border-radius: 0.75rem;
+  border: 1px solid var(--line);
+  background: #fffdf8;
+  color: var(--muted);
+  cursor: grab;
+}
+
+.palette-editor__handle span {
+  display: block;
+  width: 0.9rem;
+  height: 2px;
+  background: currentColor;
+}
+
+.palette-editor__handle:hover:enabled {
+  background: #fffdf8;
+  color: #000;
+}
+
+.palette-editor__handle:active {
+  cursor: grabbing;
 }
 
 .palette-editor__picker {
@@ -181,7 +238,13 @@
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
+  align-items: center;
   gap: 0.5rem;
+}
+
+.palette-editor__drag-hint {
+  font-size: 0.85rem;
+  color: var(--muted);
 }
 
 .palette-editor__adders {
@@ -210,7 +273,7 @@
 
 .palette-editor__preset {
   padding: 0.35rem;
-  border-radius: 0.9rem;
+  border-radius: 0;
   border: 1px solid var(--line);
   background: #fffdf8;
 }
@@ -240,7 +303,7 @@
 .preview-canvas {
   display: block;
   border: 1px solid var(--line);
-  border-radius: 1rem;
+  border-radius: 0;
   background: #fffdf8;
   image-rendering: pixelated;
 }

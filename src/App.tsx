@@ -394,39 +394,57 @@ function App() {
       </section>
 
       <section className="palette-layout">
-        <section className="panel">
-          <div className="panel__header">
-            <h2>Gradient Preview</h2>
-            <p>
-              This visual shows the exact ordered split that maps grayscale
-              values into your current palette.
-            </p>
-          </div>
+        <div className="palette-layout__stack">
+          <section className="panel">
+            <div className="panel__header">
+              <h2>Colour Curve</h2>
+              <p>
+                The live curve preview continues to drive the
+                grayscale-to-palette mapping and the final dither.
+              </p>
+            </div>
 
-          <canvas
-            ref={gradientCanvasRef}
-            className="gradient-canvas"
-            style={{ width: "100%", height: "auto" }}
-          />
+            <CurveEditor
+              points={curvePoints}
+              onChange={setCurvePoints}
+              onPreview={handlePreview}
+            />
+          </section>
 
-          <div className="gradient-scale">
-            <span>0</span>
-            <span>127</span>
-            <span>255</span>
-          </div>
+          <section className="panel">
+            <div className="panel__header">
+              <h2>Gradient Preview</h2>
+              <p>
+                This visual shows the exact ordered split that maps grayscale
+                values into your current palette.
+              </p>
+            </div>
 
-          <div className="gradient-order">
-            {normalizedPalette.map((color, index) => (
-              <div className="gradient-order__swatch" key={`${color}-${index}`}>
-                <span
-                  className="gradient-order__chip"
-                  style={{ backgroundColor: color }}
-                />
-                <code>{color}</code>
-              </div>
-            ))}
-          </div>
-        </section>
+            <canvas
+              ref={gradientCanvasRef}
+              className="gradient-canvas"
+              style={{ width: "100%", height: "auto" }}
+            />
+
+            <div className="gradient-scale">
+              <span>0</span>
+              <span>127</span>
+              <span>255</span>
+            </div>
+
+            <div className="gradient-order">
+              {normalizedPalette.map((color, index) => (
+                <div className="gradient-order__swatch" key={`${color}-${index}`}>
+                  <span
+                    className="gradient-order__chip"
+                    style={{ backgroundColor: color }}
+                  />
+                  <code>{color}</code>
+                </div>
+              ))}
+            </div>
+          </section>
+        </div>
 
         <PaletteEditor
           palette={normalizedPalette}
@@ -527,21 +545,6 @@ function App() {
         </article>
       </section>
 
-      <section className="panel">
-        <div className="panel__header">
-          <h2>Colour Curve</h2>
-          <p>
-            The live curve preview continues to drive the grayscale-to-palette
-            mapping and the final dither.
-          </p>
-        </div>
-
-        <CurveEditor
-          points={curvePoints}
-          onChange={setCurvePoints}
-          onPreview={handlePreview}
-        />
-      </section>
     </main>
   );
 }
