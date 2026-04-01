@@ -94,7 +94,10 @@ export default function CurveEditor({
     return points.map((point, index) => ({ point, index }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [points, pendingRemove]);
-  const displayPoints = displayEntries.map(({ point }) => point);
+  const displayPoints = useMemo(
+    () => displayEntries.map(({ point }) => point),
+    [displayEntries],
+  );
 
   // Notify parent of effective points whenever they change
   useEffect(() => {

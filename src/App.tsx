@@ -4,6 +4,7 @@ import {
   useRef,
   useCallback,
   useMemo,
+  useDeferredValue,
   type CSSProperties,
 } from "react";
 import "./App.css";
@@ -46,6 +47,20 @@ const normalizeCurveValue = (value: number) =>
 
 const formatCurveValue = (value: number) =>
   Number((value * 100).toFixed(2)).toString();
+
+const arePointsEqual = (left: Point[], right: Point[]) => {
+  if (left.length !== right.length) {
+    return false;
+  }
+
+  for (let index = 0; index < left.length; index += 1) {
+    if (left[index].x !== right[index].x || left[index].y !== right[index].y) {
+      return false;
+    }
+  }
+
+  return true;
+};
 
 const parseCurve = (value: string | null) => {
   if (!value) return DEFAULT_CURVE_POINTS;
@@ -186,7 +201,9 @@ function App() {
   );
 
   const handlePreview = useCallback((points: Point[]) => {
-    setEffectiveCurve(points);
+    setEffectiveCurve((previous) =>
+      arePointsEqual(previous, points) ? previous : points,
+    );
   }, []);
 
   const gradientCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -196,6 +213,7 @@ function App() {
   const canvasDitherRef = useRef<HTMLCanvasElement>(null);
 
   const normalizedPalette = useMemo(() => normalizePalette(palette), [palette]);
+  const deferredCurve = useDeferredValue(effectiveCurve);
 
   const pattern = useMemo(
     () =>
@@ -208,8 +226,8 @@ function App() {
   );
 
   const curveLut = useMemo(
-    () => buildSplineLUT(effectiveCurve),
-    [effectiveCurve],
+    () => buildSplineLUT(deferredCurve),
+    [deferredCurve],
   );
   const curvedPattern = useMemo(
     () => applyColorCurve(pattern, curveLut),
