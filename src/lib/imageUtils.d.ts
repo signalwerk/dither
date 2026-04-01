@@ -7,6 +7,13 @@ export function scaleGrayscale(
   scale: number,
 ): Float32Array;
 
+export function scaleRgba(
+  pixels: ArrayLike<number>,
+  width: number,
+  height: number,
+  scale: number,
+): Uint8ClampedArray;
+
 export function renderToCanvas(
   canvas: HTMLCanvasElement,
   rgbaPixels: ArrayLike<number>,

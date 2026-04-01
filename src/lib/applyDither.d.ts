@@ -1,8 +1,9 @@
 interface ApplyDitherOptions {
-  pixels: number[];
+  pixels: ArrayLike<number>;
   width: number;
   height: number;
   scale?: number;
+  palette: string[];
 }
 
 interface ApplyDitherResult {

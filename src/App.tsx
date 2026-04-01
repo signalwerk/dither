@@ -1,4 +1,11 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  useMemo,
+  type CSSProperties,
+} from "react";
 import "./App.css";
 import generateDither from "./lib/generateDither";
 import { img8BitToRGBA, renderToCanvas } from "./lib/imageUtils";
@@ -6,6 +13,14 @@ import applyDither from "./lib/applyDither";
 import { buildSplineLUT, applyColorCurve } from "./lib/applyColorCurve";
 import CurveEditor, { type Point } from "./lib/BezierCurveEditor";
 import { DEFAULT_CURVE_POINTS } from "./lib/curveDefaults";
+import PaletteEditor from "./PaletteEditor";
+import {
+  DEFAULT_PALETTE,
+  generateGradientRgba,
+  mapGrayscaleToPalette,
+  normalizeHexColor,
+  normalizePalette,
+} from "./lib/paletteUtils";
 
 const DEFAULT_CONFIG = {
   width: 20,
@@ -13,6 +28,9 @@ const DEFAULT_CONFIG = {
   seed: 42,
   scale: 12,
 };
+
+const GRADIENT_WIDTH = 320;
+const GRADIENT_HEIGHT = 48;
 
 type ConfigKey = keyof typeof DEFAULT_CONFIG;
 type Config = typeof DEFAULT_CONFIG;
@@ -62,6 +80,18 @@ const parseCurve = (value: string | null) => {
   return points;
 };
 
+const parsePalette = (value: string | null) => {
+  if (!value) return DEFAULT_PALETTE;
+
+  return normalizePalette(
+    value
+      .split(",")
+      .map((color) => color.trim())
+      .filter(Boolean)
+      .map(normalizeHexColor),
+  );
+};
+
 const readStateFromUrl = () => {
   const params = new URLSearchParams(window.location.search);
 
@@ -73,10 +103,15 @@ const readStateFromUrl = () => {
       scale: parsePositiveInt(params.get("scale"), DEFAULT_CONFIG.scale),
     },
     curvePoints: parseCurve(params.get("curve")),
+    palette: parsePalette(params.get("palette")),
   };
 };
 
-const writeStateToUrl = (config: Config, curvePoints: Point[]) => {
+const writeStateToUrl = (
+  config: Config,
+  curvePoints: Point[],
+  palette: string[],
+) => {
   const params = new URLSearchParams(window.location.search);
   params.set("width", String(config.width));
   params.set("height", String(config.height));
@@ -88,6 +123,7 @@ const writeStateToUrl = (config: Config, curvePoints: Point[]) => {
       .map(({ x, y }) => `${formatCurveValue(x)}-${formatCurveValue(y)}`)
       .join("--"),
   );
+  params.set("palette", normalizePalette(palette).join(","));
 
   const search = params.toString();
   const nextUrl = `${window.location.pathname}${search ? `?${search}` : ""}${window.location.hash}`;
@@ -139,21 +175,27 @@ const downloadCanvasAsPng = (
 function App() {
   const initialState = useMemo(readStateFromUrl, []);
   const [config, setConfig] = useState<Config>(initialState.config);
+  const [palette, setPalette] = useState<string[]>(
+    normalizePalette(initialState.palette),
+  );
   const [curvePoints, setCurvePoints] = useState<Point[]>(
     initialState.curvePoints,
   );
-  // effectiveCurve is what the editor reports as the live preview (may exclude a pending-remove point)
   const [effectiveCurve, setEffectiveCurve] = useState<Point[]>(
     initialState.curvePoints,
   );
-  const handlePreview = useCallback(
-    (pts: Point[]) => setEffectiveCurve(pts),
-    [],
-  );
 
+  const handlePreview = useCallback((points: Point[]) => {
+    setEffectiveCurve(points);
+  }, []);
+
+  const gradientCanvasRef = useRef<HTMLCanvasElement>(null);
   const canvasGrayRef = useRef<HTMLCanvasElement>(null);
   const canvasCurvedRef = useRef<HTMLCanvasElement>(null);
+  const canvasSplitRef = useRef<HTMLCanvasElement>(null);
   const canvasDitherRef = useRef<HTMLCanvasElement>(null);
+
+  const normalizedPalette = useMemo(() => normalizePalette(palette), [palette]);
 
   const pattern = useMemo(
     () =>
@@ -165,14 +207,49 @@ function App() {
     [config.height, config.seed, config.width],
   );
 
+  const curveLut = useMemo(
+    () => buildSplineLUT(effectiveCurve),
+    [effectiveCurve],
+  );
+  const curvedPattern = useMemo(
+    () => applyColorCurve(pattern, curveLut),
+    [pattern, curveLut],
+  );
+  const paletteMappedPattern = useMemo(
+    () => mapGrayscaleToPalette(curvedPattern, normalizedPalette),
+    [curvedPattern, normalizedPalette],
+  );
+  const gradientPreview = useMemo(
+    () => generateGradientRgba(GRADIENT_WIDTH, GRADIENT_HEIGHT, normalizedPalette),
+    [normalizedPalette],
+  );
+  const ditheredPreview = useMemo(
+    () =>
+      applyDither({
+        pixels: paletteMappedPattern,
+        width: config.width,
+        height: config.height,
+        scale: config.scale,
+        palette: normalizedPalette,
+      }),
+    [
+      paletteMappedPattern,
+      config.width,
+      config.height,
+      config.scale,
+      normalizedPalette,
+    ],
+  );
+
   useEffect(() => {
-    writeStateToUrl(config, curvePoints);
-  }, [config, curvePoints]);
+    writeStateToUrl(config, curvePoints, normalizedPalette);
+  }, [config, curvePoints, normalizedPalette]);
 
   useEffect(() => {
     const handlePopState = () => {
       const nextState = readStateFromUrl();
       setConfig(nextState.config);
+      setPalette(normalizePalette(nextState.palette));
       setCurvePoints(nextState.curvePoints);
       setEffectiveCurve(nextState.curvePoints);
     };
@@ -182,9 +259,19 @@ function App() {
   }, []);
 
   useEffect(() => {
+    if (gradientCanvasRef.current) {
+      renderToCanvas(
+        gradientCanvasRef.current,
+        gradientPreview,
+        GRADIENT_WIDTH,
+        GRADIENT_HEIGHT,
+      );
+    }
+  }, [gradientPreview]);
+
+  useEffect(() => {
     if (pattern.length === 0) return;
 
-    // 1. Raw grayscale
     if (canvasGrayRef.current) {
       renderToCanvas(
         canvasGrayRef.current,
@@ -194,44 +281,79 @@ function App() {
       );
     }
 
-    // 2. Curve-adjusted grayscale (use effectiveCurve for live preview)
-    const lut = buildSplineLUT(effectiveCurve);
-    const curved = applyColorCurve(pattern, lut);
-
     if (canvasCurvedRef.current) {
       renderToCanvas(
         canvasCurvedRef.current,
-        img8BitToRGBA(curved),
+        img8BitToRGBA(curvedPattern),
         config.width,
         config.height,
       );
     }
 
-    // 3. Dithered from the curve-adjusted pixels
-    if (canvasDitherRef.current) {
-      const { pixels, width, height } = applyDither({
-        pixels: curved,
-        width: config.width,
-        height: config.height,
-        scale: config.scale,
-      });
-      renderToCanvas(canvasDitherRef.current, pixels, width, height);
+    if (canvasSplitRef.current) {
+      renderToCanvas(
+        canvasSplitRef.current,
+        paletteMappedPattern,
+        config.width,
+        config.height,
+      );
     }
-  }, [pattern, effectiveCurve, config.width, config.height, config.scale]);
 
-  const canvasStyle = {
-    border: "1px solid #ccc",
-    imageRendering: "pixelated" as const,
-    width: `${config.width * 10}px`,
-    height: `${config.height * 10}px`,
-  };
+    if (canvasDitherRef.current) {
+      renderToCanvas(
+        canvasDitherRef.current,
+        ditheredPreview.pixels,
+        ditheredPreview.width,
+        ditheredPreview.height,
+      );
+    }
+  }, [
+    pattern,
+    curvedPattern,
+    paletteMappedPattern,
+    ditheredPreview,
+    config.width,
+    config.height,
+  ]);
+
+  const previewStyle = useMemo(
+    () =>
+      ({
+        width: `${config.width * 10}px`,
+        maxWidth: "100%",
+        height: "auto",
+      }) satisfies CSSProperties,
+    [config.width],
+  );
+
+  const ditherStyle = useMemo(
+    () =>
+      ({
+        width: `${ditheredPreview.width}px`,
+        maxWidth: "100%",
+        height: "auto",
+      }) satisfies CSSProperties,
+    [ditheredPreview.width],
+  );
 
   return (
-    <>
-      <h1>Pattern Generator</h1>
+    <main className="app-shell">
+      <header className="hero">
+        <p className="hero__eyebrow">Pattern Generator</p>
+        <h1>Palette-based dither experiments</h1>
+        <p className="hero__copy">
+          Generate the grayscale source pattern, shape it with the tone curve,
+          then map it through an ordered multi-colour palette before dithering.
+        </p>
+      </header>
 
-      <div style={{ marginBottom: "20px" }}>
-        <div>
+      <section className="panel">
+        <div className="panel__header">
+          <h2>Pattern Settings</h2>
+          <p>Adjust the base pattern dimensions, seed, and dither upscaling.</p>
+        </div>
+
+        <div className="control-grid">
           {(
             [
               ["Width", "width"],
@@ -240,46 +362,89 @@ function App() {
               ["Upscale before dither", "scale"],
             ] as [string, ConfigKey][]
           ).map(([label, key]) => (
-            <label key={key}>
-              {label}:
+            <label className="field" key={key}>
+              <span>{label}</span>
               <input
                 type="number"
                 value={config[key]}
-                onChange={(e) =>
-                  setConfig((prev) => ({
-                    ...prev,
-                    [key]: sanitizeConfigValue(key, e.target.value),
+                onChange={(event) =>
+                  setConfig((previous) => ({
+                    ...previous,
+                    [key]: sanitizeConfigValue(key, event.target.value),
                   }))
                 }
-                style={{
-                  marginLeft: "6px",
-                  marginRight: "20px",
-                  width: "60px",
-                }}
               />
             </label>
           ))}
         </div>
-        <button
-          onClick={() =>
-            setConfig((prev) => ({
-              ...prev,
-              seed: createSeed(),
-            }))
-          }
-          style={{ marginTop: "10px" }}
-        >
-          Generate New Pattern
-        </button>
-      </div>
 
-      <div style={{ display: "flex", gap: "40px", alignItems: "flex-start" }}>
-        {/* Column 1 - Raw grayscale */}
-        <div>
-          <h3>Grayscale</h3>
-          <canvas ref={canvasGrayRef} style={canvasStyle} />
-          <div style={{ marginTop: "12px" }}>
+        <div className="actions-row">
+          <button
+            type="button"
+            onClick={() =>
+              setConfig((previous) => ({
+                ...previous,
+                seed: createSeed(),
+              }))
+            }
+          >
+            Generate new pattern
+          </button>
+        </div>
+      </section>
+
+      <section className="palette-layout">
+        <section className="panel">
+          <div className="panel__header">
+            <h2>Gradient Preview</h2>
+            <p>
+              This visual shows the exact ordered split that maps grayscale
+              values into your current palette.
+            </p>
+          </div>
+
+          <canvas
+            ref={gradientCanvasRef}
+            className="gradient-canvas"
+            style={{ width: "100%", height: "auto" }}
+          />
+
+          <div className="gradient-scale">
+            <span>0</span>
+            <span>127</span>
+            <span>255</span>
+          </div>
+
+          <div className="gradient-order">
+            {normalizedPalette.map((color, index) => (
+              <div className="gradient-order__swatch" key={`${color}-${index}`}>
+                <span
+                  className="gradient-order__chip"
+                  style={{ backgroundColor: color }}
+                />
+                <code>{color}</code>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <PaletteEditor
+          palette={normalizedPalette}
+          onChange={(nextPalette) => setPalette(normalizePalette(nextPalette))}
+        />
+      </section>
+
+      <section className="preview-grid">
+        <article className="panel preview-card">
+          <div className="panel__header">
+            <h2>Grayscale</h2>
+            <p>The generated base texture before any tone adjustment.</p>
+          </div>
+          <canvas ref={canvasGrayRef} className="preview-canvas" style={previewStyle} />
+          <div className="actions-row">
             <button
+              type="button"
+              className="button button--secondary"
               onClick={() =>
                 downloadCanvasAsPng(canvasGrayRef.current, "grayscale.png")
               }
@@ -287,14 +452,22 @@ function App() {
               Download PNG
             </button>
           </div>
-        </div>
+        </article>
 
-        {/* Column 2 - Bezier curve editor + curve-adjusted preview */}
-        <div>
-          <h3>Curve-adjusted</h3>
-          <canvas ref={canvasCurvedRef} style={canvasStyle} />
-          <div style={{ marginTop: "12px" }}>
+        <article className="panel preview-card">
+          <div className="panel__header">
+            <h2>Curve-adjusted</h2>
+            <p>The grayscale source after the tone curve has been applied.</p>
+          </div>
+          <canvas
+            ref={canvasCurvedRef}
+            className="preview-canvas"
+            style={previewStyle}
+          />
+          <div className="actions-row">
             <button
+              type="button"
+              className="button button--secondary"
               onClick={() =>
                 downloadCanvasAsPng(
                   canvasCurvedRef.current,
@@ -305,25 +478,45 @@ function App() {
               Download PNG
             </button>
           </div>
-          <div style={{ marginTop: "16px" }}>
-            <h3>Colour Curve</h3>
-            <CurveEditor
-              points={curvePoints}
-              onChange={setCurvePoints}
-              onPreview={handlePreview}
-            />
-          </div>
-        </div>
+        </article>
 
-        {/* Column 3 - Dithered output */}
-        <div>
-          <h3>Dithered (B&amp;W)</h3>
+        <article className="panel preview-card">
+          <div className="panel__header">
+            <h2>Palette mapped</h2>
+            <p>The curve-adjusted values remapped through the palette split.</p>
+          </div>
+          <canvas
+            ref={canvasSplitRef}
+            className="preview-canvas"
+            style={previewStyle}
+          />
+          <div className="actions-row">
+            <button
+              type="button"
+              className="button button--secondary"
+              onClick={() =>
+                downloadCanvasAsPng(canvasSplitRef.current, "palette-mapped.png")
+              }
+            >
+              Download PNG
+            </button>
+          </div>
+        </article>
+
+        <article className="panel preview-card">
+          <div className="panel__header">
+            <h2>Dithered</h2>
+            <p>The scaled colour preview quantized back onto the palette.</p>
+          </div>
           <canvas
             ref={canvasDitherRef}
-            style={{ border: "1px solid #ccc", imageRendering: "pixelated" }}
+            className="preview-canvas"
+            style={ditherStyle}
           />
-          <div style={{ marginTop: "12px" }}>
+          <div className="actions-row">
             <button
+              type="button"
+              className="button button--secondary"
               onClick={() =>
                 downloadCanvasAsPng(canvasDitherRef.current, "dithered.png")
               }
@@ -331,9 +524,25 @@ function App() {
               Download PNG
             </button>
           </div>
+        </article>
+      </section>
+
+      <section className="panel">
+        <div className="panel__header">
+          <h2>Colour Curve</h2>
+          <p>
+            The live curve preview continues to drive the grayscale-to-palette
+            mapping and the final dither.
+          </p>
         </div>
-      </div>
-    </>
+
+        <CurveEditor
+          points={curvePoints}
+          onChange={setCurvePoints}
+          onPreview={handlePreview}
+        />
+      </section>
+    </main>
   );
 }
 

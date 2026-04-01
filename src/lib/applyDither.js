@@ -1,38 +1,40 @@
 import { applyPaletteSync, utils } from "image-q";
-import { img8BitToRGBA, scaleGrayscale } from "./imageUtils";
+import { scaleRgba } from "./imageUtils";
+import { hexToRgb, normalizePalette } from "./paletteUtils";
 
 /**
- * Apply Jarvis dithering via image-q, mirroring the original script.js pipeline.
+ * Apply palette dithering via image-q, mirroring the old multi-colour flow.
  *
  * @param {object} opts
- * @param {number[]} opts.pixels  - Flat grayscale array (values 0–255), width × height
+ * @param {ArrayLike<number>} opts.pixels  - Flat RGBA array, width × height × 4
  * @param {number}   opts.width
  * @param {number}   opts.height
  * @param {number}   [opts.scale=12] - Upscale factor applied before dithering
+ * @param {string[]} opts.palette
  * @returns {{ pixels: Uint8ClampedArray, width: number, height: number }}
  */
-const applyDither = ({ pixels, width, height, scale = 12 }) => {
+const applyDither = ({ pixels, width, height, scale = 12, palette }) => {
   const scaledW = width * scale;
   const scaledH = height * scale;
 
-  // 1. Scale grayscale → RGBA Uint8Array (matches imgScaler(img8BitTo32Bit(...)) in script.js)
-  const scaled8 = scaleGrayscale(pixels, width, height, scale);
-  const scaledRGBA = img8BitToRGBA(Array.from(scaled8));
+  const normalizedPalette = normalizePalette(palette);
+  const scaledRGBA = scaleRgba(pixels, width, height, scale);
 
-  // 2. Feed into image-q
   const pointContainer = utils.PointContainer.fromUint8Array(
     scaledRGBA,
     scaledW,
     scaledH,
   );
 
-  const palette = new utils.Palette();
-  palette.add(utils.Point.createByRGBA(0, 0, 0, 255));
-  palette.add(utils.Point.createByRGBA(255, 255, 255, 255));
+  const quantizedPalette = new utils.Palette();
+  normalizedPalette.forEach((color) => {
+    const [r, g, b] = hexToRgb(color);
+    quantizedPalette.add(utils.Point.createByRGBA(r, g, b, 255));
+  });
 
-  const out = applyPaletteSync(pointContainer, palette, {
-    colorDistanceFormula: "euclidean",
-    imageQuantization: "jarvis",
+  const out = applyPaletteSync(pointContainer, quantizedPalette, {
+    colorDistanceFormula: "ciede2000",
+    imageQuantization: "riemersma",
   });
 
   return { pixels: out.toUint8Array(), width: scaledW, height: scaledH };
