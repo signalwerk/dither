@@ -4,7 +4,11 @@
   font-weight: 400;
   color: #232121;
   background:
-    radial-gradient(circle at top left, rgba(228, 228, 219, 0.95), transparent 36%),
+    radial-gradient(
+      circle at top left,
+      rgba(228, 228, 219, 0.95),
+      transparent 36%
+    ),
     linear-gradient(180deg, #f7f1e9 0%, #ece3d8 100%);
   --bg-soft: rgba(240, 232, 220, 0.8);
   --panel: rgba(255, 250, 244, 0.88);

@@ -16,6 +16,9 @@ height=34
 seed=134
 scale=8
 curve=0-0--100-75
+colorDistanceFormula=Euclidean
+imageQuantization=Jarvis
+palette=000000--ffffff
 ```
 
 ![](./example/kniterate/photo_upscale.png)
@@ -35,6 +38,9 @@ height=20
 seed=44
 scale=6
 curve=0-0--100-75
+colorDistanceFormula=Euclidean
+imageQuantization=Jarvis
+palette=000000--ffffff
 ```
 
 ![](./example/brother/photo_upscale.png)

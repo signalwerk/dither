@@ -139,7 +139,9 @@ function PaletteRow({
       </div>
 
       <div className="palette-editor__row-actions">
-        <span className="palette-editor__drag-hint">Drag handle to reorder</span>
+        <span className="palette-editor__drag-hint">
+          Drag handle to reorder
+        </span>
         <button
           type="button"
           className="button button--ghost"
@@ -223,10 +225,14 @@ function PaletteEditor({ palette, onChange }: PaletteEditorProps) {
         sensors={sensors}
         onDragStart={handleDragStart}
         onDragMove={(event) =>
-          setOverSlotIndex(getSlotIndex(event.over ? String(event.over.id) : null))
+          setOverSlotIndex(
+            getSlotIndex(event.over ? String(event.over.id) : null),
+          )
         }
         onDragOver={(event) =>
-          setOverSlotIndex(getSlotIndex(event.over ? String(event.over.id) : null))
+          setOverSlotIndex(
+            getSlotIndex(event.over ? String(event.over.id) : null),
+          )
         }
         onDragCancel={() => {
           setActiveId(null);
