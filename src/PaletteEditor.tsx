@@ -116,13 +116,22 @@ function PaletteRow({
         <span />
       </button>
 
-      <input
+      <label
+        className="palette-editor__picker-circle"
         aria-label={`Palette color ${index + 1}`}
-        className="palette-editor__picker"
-        type="color"
-        value={color}
-        onChange={(event) => onUpdateColor(index, event.target.value)}
-      />
+      >
+        <span
+          className="palette-editor__picker-circle-fill"
+          style={{ backgroundColor: color }}
+        />
+        <input
+          aria-label={`Palette color ${index + 1}`}
+          className="palette-editor__picker-input"
+          type="color"
+          value={color}
+          onChange={(event) => onUpdateColor(index, event.target.value)}
+        />
+      </label>
 
       <div className="palette-editor__meta">
         <span>Stop {index + 1}</span>
@@ -247,13 +256,22 @@ function PaletteEditor({ palette, onChange }: PaletteEditorProps) {
 
       <div className="palette-editor__adders">
         <div className="palette-editor__adder">
-          <input
+          <label
+            className="palette-editor__picker-circle"
             aria-label="Custom color to add"
-            className="palette-editor__picker"
-            type="color"
-            value={customColor}
-            onChange={(event) => setCustomColor(event.target.value)}
-          />
+          >
+            <span
+              className="palette-editor__picker-circle-fill"
+              style={{ backgroundColor: customColor }}
+            />
+            <input
+              aria-label="Custom color to add"
+              className="palette-editor__picker-input"
+              type="color"
+              value={customColor}
+              onChange={(event) => setCustomColor(event.target.value)}
+            />
+          </label>
           <button type="button" onClick={addCustomColor}>
             Add custom colour
           </button>

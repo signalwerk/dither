@@ -11,9 +11,19 @@ import { hexToRgb, normalizePalette } from "./paletteUtils";
  * @param {number}   opts.height
  * @param {number}   [opts.scale=12] - Upscale factor applied before dithering
  * @param {string[]} opts.palette
+ * @param {string}   [opts.colorDistanceFormula="ciede2000"]
+ * @param {string}   [opts.imageQuantization="riemersma"]
  * @returns {{ pixels: Uint8ClampedArray, width: number, height: number }}
  */
-const applyDither = ({ pixels, width, height, scale = 12, palette }) => {
+const applyDither = ({
+  pixels,
+  width,
+  height,
+  scale = 12,
+  palette,
+  colorDistanceFormula = "ciede2000",
+  imageQuantization = "riemersma",
+}) => {
   const scaledW = width * scale;
   const scaledH = height * scale;
 
@@ -33,8 +43,8 @@ const applyDither = ({ pixels, width, height, scale = 12, palette }) => {
   });
 
   const out = applyPaletteSync(pointContainer, quantizedPalette, {
-    colorDistanceFormula: "ciede2000",
-    imageQuantization: "riemersma",
+    colorDistanceFormula,
+    imageQuantization,
   });
 
   return { pixels: out.toUint8Array(), width: scaledW, height: scaledH };

@@ -215,13 +215,31 @@
   cursor: grabbing;
 }
 
-.palette-editor__picker {
+.palette-editor__picker-circle {
+  position: relative;
   width: 3rem;
   min-width: 3rem;
-  height: 2.6rem;
-  padding: 0;
-  border-radius: 0.9rem;
+  height: 3rem;
+  border-radius: 999px;
   overflow: hidden;
+  cursor: pointer;
+}
+
+.palette-editor__picker-circle-fill {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 999px;
+  border: 1px solid rgba(35, 33, 33, 0.18);
+}
+
+.palette-editor__picker-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
 }
 
 .palette-editor__meta {
@@ -272,10 +290,16 @@
 }
 
 .palette-editor__preset {
-  padding: 0.35rem;
-  border-radius: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 3rem;
+  height: 3rem;
+  padding: 0;
+  border-radius: 999px;
   border: 1px solid var(--line);
   background: #fffdf8;
+  overflow: hidden;
 }
 
 .palette-editor__preset:hover:enabled {
@@ -285,8 +309,8 @@
 .palette-editor__preset-swatch {
   display: block;
   width: 100%;
-  height: 2rem;
-  border-radius: 0.7rem;
+  height: 100%;
+  border-radius: 999px;
 }
 
 .preview-grid {
@@ -302,8 +326,6 @@
 
 .preview-canvas {
   display: block;
-  border: 1px solid var(--line);
-  border-radius: 0;
   background: #fffdf8;
   image-rendering: pixelated;
 }

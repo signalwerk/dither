@@ -11,6 +11,10 @@ import "./App.css";
 import generateDither from "./lib/generateDither";
 import { img8BitToRGBA, renderToCanvas } from "./lib/imageUtils";
 import applyDither from "./lib/applyDither";
+import type {
+  ColorDistanceFormula,
+  ImageQuantization,
+} from "./lib/applyDither";
 import { buildSplineLUT, applyColorCurve } from "./lib/applyColorCurve";
 import CurveEditor, { type Point } from "./lib/BezierCurveEditor";
 import { DEFAULT_CURVE_POINTS } from "./lib/curveDefaults";
@@ -30,16 +34,68 @@ const DEFAULT_CONFIG = {
   scale: 12,
 };
 
+const DEFAULT_DITHER_OPTIONS = {
+  colorDistanceFormula: "ciede2000" as ColorDistanceFormula,
+  imageQuantization: "jarvis" as ImageQuantization,
+};
+
 const GRADIENT_WIDTH = 320;
 const GRADIENT_HEIGHT = 48;
 
+const COLOR_DISTANCE_OPTIONS = [
+  { value: "cie94-textiles", label: "CIE94 Textiles" },
+  { value: "cie94-graphic-arts", label: "CIE94 Graphic Arts" },
+  { value: "ciede2000", label: "CIEDE2000" },
+  { value: "color-metric", label: "Color Metric" },
+  { value: "euclidean", label: "Euclidean" },
+  { value: "euclidean-bt709-noalpha", label: "Euclidean BT709 No Alpha" },
+  { value: "euclidean-bt709", label: "Euclidean BT709" },
+  { value: "manhattan", label: "Manhattan" },
+  { value: "manhattan-bt709", label: "Manhattan BT709" },
+  { value: "manhattan-nommyde", label: "Manhattan Nommyde" },
+  { value: "pngquant", label: "PNGQuant" },
+] as const satisfies ReadonlyArray<{
+  value: ColorDistanceFormula;
+  label: string;
+}>;
+
+const IMAGE_QUANTIZATION_OPTIONS = [
+  { value: "nearest", label: "Nearest" },
+  { value: "riemersma", label: "Riemersma" },
+  { value: "floyd-steinberg", label: "Floyd-Steinberg" },
+  { value: "false-floyd-steinberg", label: "False Floyd-Steinberg" },
+  { value: "stucki", label: "Stucki" },
+  { value: "atkinson", label: "Atkinson" },
+  { value: "jarvis", label: "Jarvis" },
+  { value: "burkes", label: "Burkes" },
+  { value: "sierra", label: "Sierra" },
+  { value: "two-sierra", label: "Two-Sierra" },
+  { value: "sierra-lite", label: "Sierra Lite" },
+] as const satisfies ReadonlyArray<{
+  value: ImageQuantization;
+  label: string;
+}>;
+
 type ConfigKey = keyof typeof DEFAULT_CONFIG;
 type Config = typeof DEFAULT_CONFIG;
+type DitherOptions = typeof DEFAULT_DITHER_OPTIONS;
 
 const parsePositiveInt = (value: string | null, fallback: number) => {
   if (value === null) return fallback;
   const parsed = Number.parseInt(value, 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+};
+
+const parseOption = <T extends string>(
+  value: string | null,
+  options: readonly { value: T }[],
+  fallback: T,
+) => {
+  if (value === null) {
+    return fallback;
+  }
+
+  return options.some((option) => option.value === value) ? value as T : fallback;
 };
 
 const normalizeCurveValue = (value: number) =>
@@ -117,6 +173,18 @@ const readStateFromUrl = () => {
       seed: parsePositiveInt(params.get("seed"), DEFAULT_CONFIG.seed),
       scale: parsePositiveInt(params.get("scale"), DEFAULT_CONFIG.scale),
     },
+    ditherOptions: {
+      colorDistanceFormula: parseOption(
+        params.get("colorDistanceFormula"),
+        COLOR_DISTANCE_OPTIONS,
+        DEFAULT_DITHER_OPTIONS.colorDistanceFormula,
+      ),
+      imageQuantization: parseOption(
+        params.get("imageQuantization"),
+        IMAGE_QUANTIZATION_OPTIONS,
+        DEFAULT_DITHER_OPTIONS.imageQuantization,
+      ),
+    },
     curvePoints: parseCurve(params.get("curve")),
     palette: parsePalette(params.get("palette")),
   };
@@ -124,6 +192,7 @@ const readStateFromUrl = () => {
 
 const writeStateToUrl = (
   config: Config,
+  ditherOptions: DitherOptions,
   curvePoints: Point[],
   palette: string[],
 ) => {
@@ -132,6 +201,8 @@ const writeStateToUrl = (
   params.set("height", String(config.height));
   params.set("seed", String(config.seed));
   params.set("scale", String(config.scale));
+  params.set("colorDistanceFormula", ditherOptions.colorDistanceFormula);
+  params.set("imageQuantization", ditherOptions.imageQuantization);
   params.set(
     "curve",
     curvePoints
@@ -190,6 +261,9 @@ const downloadCanvasAsPng = (
 function App() {
   const initialState = useMemo(readStateFromUrl, []);
   const [config, setConfig] = useState<Config>(initialState.config);
+  const [ditherOptions, setDitherOptions] = useState<DitherOptions>(
+    initialState.ditherOptions,
+  );
   const [palette, setPalette] = useState<string[]>(
     normalizePalette(initialState.palette),
   );
@@ -249,6 +323,8 @@ function App() {
         height: config.height,
         scale: config.scale,
         palette: normalizedPalette,
+        colorDistanceFormula: ditherOptions.colorDistanceFormula,
+        imageQuantization: ditherOptions.imageQuantization,
       }),
     [
       paletteMappedPattern,
@@ -256,17 +332,20 @@ function App() {
       config.height,
       config.scale,
       normalizedPalette,
+      ditherOptions.colorDistanceFormula,
+      ditherOptions.imageQuantization,
     ],
   );
 
   useEffect(() => {
-    writeStateToUrl(config, curvePoints, normalizedPalette);
-  }, [config, curvePoints, normalizedPalette]);
+    writeStateToUrl(config, ditherOptions, curvePoints, normalizedPalette);
+  }, [config, ditherOptions, curvePoints, normalizedPalette]);
 
   useEffect(() => {
     const handlePopState = () => {
       const nextState = readStateFromUrl();
       setConfig(nextState.config);
+      setDitherOptions(nextState.ditherOptions);
       setPalette(normalizePalette(nextState.palette));
       setCurvePoints(nextState.curvePoints);
       setEffectiveCurve(nextState.curvePoints);
@@ -396,6 +475,54 @@ function App() {
           ))}
         </div>
 
+        <div className="control-grid control-grid--secondary">
+          <label className="field">
+            <span>Color distance formula</span>
+            <select
+              value={ditherOptions.colorDistanceFormula}
+              onChange={(event) =>
+                setDitherOptions((previous) => ({
+                  ...previous,
+                  colorDistanceFormula: parseOption(
+                    event.target.value,
+                    COLOR_DISTANCE_OPTIONS,
+                    DEFAULT_DITHER_OPTIONS.colorDistanceFormula,
+                  ),
+                }))
+              }
+            >
+              {COLOR_DISTANCE_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="field">
+            <span>Image quantization</span>
+            <select
+              value={ditherOptions.imageQuantization}
+              onChange={(event) =>
+                setDitherOptions((previous) => ({
+                  ...previous,
+                  imageQuantization: parseOption(
+                    event.target.value,
+                    IMAGE_QUANTIZATION_OPTIONS,
+                    DEFAULT_DITHER_OPTIONS.imageQuantization,
+                  ),
+                }))
+              }
+            >
+              {IMAGE_QUANTIZATION_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+
         <div className="actions-row">
           <button
             type="button"
@@ -446,8 +573,8 @@ function App() {
 
             <div className="gradient-scale">
               <span>0</span>
-              <span>127</span>
-              <span>255</span>
+              <span>50</span>
+              <span>100</span>
             </div>
 
             <div className="gradient-order">

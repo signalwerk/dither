@@ -87,7 +87,8 @@ button:focus-visible {
 }
 
 input[type="number"],
-input[type="text"] {
+input[type="text"],
+select {
   width: 100%;
   border: 1px solid var(--line);
   border-radius: 0.9rem;
