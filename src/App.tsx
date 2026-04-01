@@ -23,9 +23,11 @@ const parsePositiveInt = (value: string | null, fallback: number) => {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 };
 
-const normalizeCurveValue = (value: number) => (value > 1 ? value / 100 : value);
+const normalizeCurveValue = (value: number) =>
+  value > 1 ? value / 100 : value;
 
-const formatCurveValue = (value: number) => Number((value * 100).toFixed(2)).toString();
+const formatCurveValue = (value: number) =>
+  Number((value * 100).toFixed(2)).toString();
 
 const parseCurve = (value: string | null) => {
   if (!value) return DEFAULT_CURVE_POINTS;
@@ -33,7 +35,7 @@ const parseCurve = (value: string | null) => {
   const points = value
     .split("--")
     .map((segment) => {
-      const [rawX, rawY] = segment.split("-", 2)
+      const [rawX, rawY] = segment.split("-", 2);
       const x = Number.parseFloat(rawX);
       const y = Number.parseFloat(rawY);
 
@@ -82,7 +84,9 @@ const writeStateToUrl = (config: Config, curvePoints: Point[]) => {
   params.set("scale", String(config.scale));
   params.set(
     "curve",
-    curvePoints.map(({ x, y }) => `${formatCurveValue(x)}-${formatCurveValue(y)}`).join("--"),
+    curvePoints
+      .map(({ x, y }) => `${formatCurveValue(x)}-${formatCurveValue(y)}`)
+      .join("--"),
   );
 
   const search = params.toString();
@@ -102,13 +106,50 @@ const createSeed = () => {
   return Math.floor(Math.random() * 2147483646) + 1;
 };
 
+const downloadCanvasAsPng = (
+  canvas: HTMLCanvasElement | null,
+  filename: string,
+) => {
+  if (!canvas) return;
+
+  const triggerDownload = (url: string) => {
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    link.click();
+  };
+
+  if (typeof canvas.toBlob === "function") {
+    canvas.toBlob((blob) => {
+      if (!blob) {
+        triggerDownload(canvas.toDataURL("image/png"));
+        return;
+      }
+
+      const url = URL.createObjectURL(blob);
+      triggerDownload(url);
+      window.setTimeout(() => URL.revokeObjectURL(url), 0);
+    }, "image/png");
+    return;
+  }
+
+  triggerDownload(canvas.toDataURL("image/png"));
+};
+
 function App() {
   const initialState = useMemo(readStateFromUrl, []);
   const [config, setConfig] = useState<Config>(initialState.config);
-  const [curvePoints, setCurvePoints] = useState<Point[]>(initialState.curvePoints);
+  const [curvePoints, setCurvePoints] = useState<Point[]>(
+    initialState.curvePoints,
+  );
   // effectiveCurve is what the editor reports as the live preview (may exclude a pending-remove point)
-  const [effectiveCurve, setEffectiveCurve] = useState<Point[]>(initialState.curvePoints);
-  const handlePreview = useCallback((pts: Point[]) => setEffectiveCurve(pts), []);
+  const [effectiveCurve, setEffectiveCurve] = useState<Point[]>(
+    initialState.curvePoints,
+  );
+  const handlePreview = useCallback(
+    (pts: Point[]) => setEffectiveCurve(pts),
+    [],
+  );
 
   const canvasGrayRef = useRef<HTMLCanvasElement>(null);
   const canvasCurvedRef = useRef<HTMLCanvasElement>(null);
@@ -145,7 +186,12 @@ function App() {
 
     // 1. Raw grayscale
     if (canvasGrayRef.current) {
-      renderToCanvas(canvasGrayRef.current, img8BitToRGBA(pattern), config.width, config.height);
+      renderToCanvas(
+        canvasGrayRef.current,
+        img8BitToRGBA(pattern),
+        config.width,
+        config.height,
+      );
     }
 
     // 2. Curve-adjusted grayscale (use effectiveCurve for live preview)
@@ -153,7 +199,12 @@ function App() {
     const curved = applyColorCurve(pattern, lut);
 
     if (canvasCurvedRef.current) {
-      renderToCanvas(canvasCurvedRef.current, img8BitToRGBA(curved), config.width, config.height);
+      renderToCanvas(
+        canvasCurvedRef.current,
+        img8BitToRGBA(curved),
+        config.width,
+        config.height,
+      );
     }
 
     // 3. Dithered from the curve-adjusted pixels
@@ -177,8 +228,7 @@ function App() {
 
   return (
     <>
-      <h1>Scarf</h1>
-      <p>Pattern Generator</p>
+      <h1>Pattern Generator</h1>
 
       <div style={{ marginBottom: "20px" }}>
         <div>
@@ -187,7 +237,7 @@ function App() {
               ["Width", "width"],
               ["Height", "height"],
               ["Seed", "seed"],
-              ["Scale", "scale"],
+              ["Upscale before dither", "scale"],
             ] as [string, ConfigKey][]
           ).map(([label, key]) => (
             <label key={key}>
@@ -201,7 +251,11 @@ function App() {
                     [key]: sanitizeConfigValue(key, e.target.value),
                   }))
                 }
-                style={{ marginLeft: "6px", marginRight: "20px", width: "60px" }}
+                style={{
+                  marginLeft: "6px",
+                  marginRight: "20px",
+                  width: "60px",
+                }}
               />
             </label>
           ))}
@@ -224,15 +278,40 @@ function App() {
         <div>
           <h3>Grayscale</h3>
           <canvas ref={canvasGrayRef} style={canvasStyle} />
+          <div style={{ marginTop: "12px" }}>
+            <button
+              onClick={() =>
+                downloadCanvasAsPng(canvasGrayRef.current, "grayscale.png")
+              }
+            >
+              Download PNG
+            </button>
+          </div>
         </div>
 
         {/* Column 2 - Bezier curve editor + curve-adjusted preview */}
         <div>
           <h3>Curve-adjusted</h3>
           <canvas ref={canvasCurvedRef} style={canvasStyle} />
+          <div style={{ marginTop: "12px" }}>
+            <button
+              onClick={() =>
+                downloadCanvasAsPng(
+                  canvasCurvedRef.current,
+                  "curve-adjusted.png",
+                )
+              }
+            >
+              Download PNG
+            </button>
+          </div>
           <div style={{ marginTop: "16px" }}>
             <h3>Colour Curve</h3>
-            <CurveEditor points={curvePoints} onChange={setCurvePoints} onPreview={handlePreview} />
+            <CurveEditor
+              points={curvePoints}
+              onChange={setCurvePoints}
+              onPreview={handlePreview}
+            />
           </div>
         </div>
 
@@ -243,6 +322,15 @@ function App() {
             ref={canvasDitherRef}
             style={{ border: "1px solid #ccc", imageRendering: "pixelated" }}
           />
+          <div style={{ marginTop: "12px" }}>
+            <button
+              onClick={() =>
+                downloadCanvasAsPng(canvasDitherRef.current, "dithered.png")
+              }
+            >
+              Download PNG
+            </button>
+          </div>
         </div>
       </div>
     </>

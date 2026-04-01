@@ -34,7 +34,8 @@ const computeSpline = (pts) => {
 
   for (let j = n - 1; j >= 0; j--) {
     c[j] = z[j] - mu[j] * c[j + 1];
-    b[j] = (pts[j + 1].y - pts[j].y) / h[j] - h[j] * (c[j + 1] + 2 * c[j]) / 3;
+    b[j] =
+      (pts[j + 1].y - pts[j].y) / h[j] - (h[j] * (c[j + 1] + 2 * c[j])) / 3;
     d[j] = (c[j + 1] - c[j]) / (3 * h[j]);
   }
 

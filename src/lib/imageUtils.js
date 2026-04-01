@@ -5,7 +5,7 @@ export const img8BitToRGBA = (pixels) => {
   const result = new Uint8ClampedArray(pixels.length * 4);
   for (let i = 0; i < pixels.length; i++) {
     const v = Math.floor(Math.max(0, Math.min(255, pixels[i])));
-    result[i * 4]     = v;
+    result[i * 4] = v;
     result[i * 4 + 1] = v;
     result[i * 4 + 2] = v;
     result[i * 4 + 3] = 255;

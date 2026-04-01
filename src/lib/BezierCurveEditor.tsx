@@ -24,15 +24,23 @@ const PAD = POINT_R + 2;
 const REMOVE_MARGIN = 40;
 const MIN_GAP = 0.005;
 
-const formatPercent = (value: number) => Number((value * 100).toFixed(2)).toString();
+const formatPercent = (value: number) =>
+  Number((value * 100).toFixed(2)).toString();
 const nudgeToIntegerPercent = (value: number, direction: -1 | 1) => {
   const percent = value * 100;
   const nextPercent =
-    direction > 0 ? Math.floor(percent + Number.EPSILON) + 1 : Math.ceil(percent - Number.EPSILON) - 1;
+    direction > 0
+      ? Math.floor(percent + Number.EPSILON) + 1
+      : Math.ceil(percent - Number.EPSILON) - 1;
   return nextPercent / 100;
 };
 
-export default function CurveEditor({ points, onChange, onPreview, size = 220 }: Props) {
+export default function CurveEditor({
+  points,
+  onChange,
+  onPreview,
+  size = 220,
+}: Props) {
   const svgRef = useRef<SVGSVGElement>(null);
   const dragging = useRef<number | null>(null);
   const [pendingRemove, setPendingRemove] = useState<number | null>(null);
@@ -162,18 +170,15 @@ export default function CurveEditor({ points, onChange, onPreview, size = 220 }:
     [size],
   );
 
-  const isOutside = useCallback(
-    (e: React.PointerEvent | PointerEvent) => {
-      const rect = svgRef.current!.getBoundingClientRect();
-      return (
-        e.clientX < rect.left - REMOVE_MARGIN ||
-        e.clientX > rect.right + REMOVE_MARGIN ||
-        e.clientY < rect.top - REMOVE_MARGIN ||
-        e.clientY > rect.bottom + REMOVE_MARGIN
-      );
-    },
-    [],
-  );
+  const isOutside = useCallback((e: React.PointerEvent | PointerEvent) => {
+    const rect = svgRef.current!.getBoundingClientRect();
+    return (
+      e.clientX < rect.left - REMOVE_MARGIN ||
+      e.clientX > rect.right + REMOVE_MARGIN ||
+      e.clientY < rect.top - REMOVE_MARGIN ||
+      e.clientY > rect.bottom + REMOVE_MARGIN
+    );
+  }, []);
 
   // --- pointer handlers ---
 
@@ -195,7 +200,12 @@ export default function CurveEditor({ points, onChange, onPreview, size = 220 }:
       const { nx, ny } = pointerToNorm(e);
 
       // Interior point dragged outside → mark for removal preview
-      if (idx > 0 && idx < points.length - 1 && points.length > 2 && isOutside(e)) {
+      if (
+        idx > 0 &&
+        idx < points.length - 1 &&
+        points.length > 2 &&
+        isOutside(e)
+      ) {
         setPendingRemove(idx);
         return;
       }
@@ -291,16 +301,13 @@ export default function CurveEditor({ points, onChange, onPreview, size = 220 }:
 
   const selectedPoint = selectedIndex !== null ? points[selectedIndex] : null;
 
-  const handleDraftChange = useCallback(
-    (axis: "x" | "y", value: string) => {
-      if (axis === "x") {
-        setInputDraft(value);
-      } else {
-        setOutputDraft(value);
-      }
-    },
-    [],
-  );
+  const handleDraftChange = useCallback((axis: "x" | "y", value: string) => {
+    if (axis === "x") {
+      setInputDraft(value);
+    } else {
+      setOutputDraft(value);
+    }
+  }, []);
 
   const commitDraft = useCallback(
     (axis: "x" | "y") => {
@@ -381,28 +388,68 @@ export default function CurveEditor({ points, onChange, onPreview, size = 220 }:
         onDoubleClick={onDblClick}
       >
         {/* Graph background */}
-        <rect x={PAD} y={PAD} width={size} height={size} fill="#111" stroke="#444" strokeWidth={1} rx={2} />
+        <rect
+          x={PAD}
+          y={PAD}
+          width={size}
+          height={size}
+          fill="#111"
+          stroke="#444"
+          strokeWidth={1}
+          rx={2}
+        />
 
         {/* Grid */}
         {gridValues.map((v) => (
           <g key={v}>
-            <line x1={PAD + v * size} y1={PAD} x2={PAD + v * size} y2={PAD + size} stroke="#222" strokeWidth={1} />
-            <line x1={PAD} y1={PAD + v * size} x2={PAD + size} y2={PAD + v * size} stroke="#222" strokeWidth={1} />
+            <line
+              x1={PAD + v * size}
+              y1={PAD}
+              x2={PAD + v * size}
+              y2={PAD + size}
+              stroke="#222"
+              strokeWidth={1}
+            />
+            <line
+              x1={PAD}
+              y1={PAD + v * size}
+              x2={PAD + size}
+              y2={PAD + v * size}
+              stroke="#222"
+              strokeWidth={1}
+            />
           </g>
         ))}
 
         {/* Identity diagonal */}
         <line
-          x1={PAD} y1={PAD + size} x2={PAD + size} y2={PAD}
-          stroke="#333" strokeWidth={1} strokeDasharray="4 4"
+          x1={PAD}
+          y1={PAD + size}
+          x2={PAD + size}
+          y2={PAD}
+          stroke="#333"
+          strokeWidth={1}
+          strokeDasharray="4 4"
         />
 
         {/* Flat extensions for endpoints dragged inward */}
         {leftExt && (
-          <path d={leftExt} fill="none" stroke="#fff" strokeWidth={1.5} strokeDasharray="3 3" />
+          <path
+            d={leftExt}
+            fill="none"
+            stroke="#fff"
+            strokeWidth={1.5}
+            strokeDasharray="3 3"
+          />
         )}
         {rightExt && (
-          <path d={rightExt} fill="none" stroke="#fff" strokeWidth={1.5} strokeDasharray="3 3" />
+          <path
+            d={rightExt}
+            fill="none"
+            stroke="#fff"
+            strokeWidth={1.5}
+            strokeDasharray="3 3"
+          />
         )}
 
         {/* Spline curve */}
@@ -428,9 +475,15 @@ export default function CurveEditor({ points, onChange, onPreview, size = 220 }:
         })}
 
         {/* Axis labels */}
-        <text x={PAD + 2} y={PAD + size - 3} fontSize={9} fill="#555">0</text>
-        <text x={PAD + size - 18} y={PAD + size - 3} fontSize={9} fill="#555">100</text>
-        <text x={PAD + 2} y={PAD + 10} fontSize={9} fill="#555">100</text>
+        <text x={PAD + 2} y={PAD + size - 3} fontSize={9} fill="#555">
+          0
+        </text>
+        <text x={PAD + size - 18} y={PAD + size - 3} fontSize={9} fill="#555">
+          100
+        </text>
+        <text x={PAD + 2} y={PAD + 10} fontSize={9} fill="#555">
+          100
+        </text>
       </svg>
       <div style={{ display: "flex", gap: "12px", marginTop: "10px" }}>
         <label>

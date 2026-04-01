@@ -4,48 +4,42 @@ Generation of dither patterns.
 
 ## Knitting
 
-The Patterns are developed for Knitting
+The patterns are developed for knitting.
 
 ### Test with Kniterate
 
-April 2024
+April 2024 (original generator)
 
-```js
-let config = {
-  width: 5, // block width
-  height: 34, // block height
-  pixelWidth: 8, // each blocks is 8 × 8px
-  upscaleFactor: 1, // the resulting image
-  seed: 134, // seed for random generator
-  colorFactor: 0.75, // darken the overall color
-};
+```txt
+width=5
+height=34
+seed=134
+scale=8
+curve=0-0--100-75
 ```
 
-![](./docs/example/kniterate/photo_upscale.png)
+![](./example/kniterate/photo_upscale.png)
 
 ### Results
 
-![](./docs/example/kniterate/IMG_5143.jpg)
-![](./docs/example/kniterate/IMG_5157.jpg)
+![](./example/kniterate/IMG_5143.jpg)
+![](./example/kniterate/IMG_5157.jpg)
 
 ### Test with Brother KH-940 Knitting Machine
 
-April 2019
+April 2019 (original generator)
 
-```js
-let config = {
-  width: 8, // block width
-  height: 20, // block height
-  pixelWidth: 6, // each blocks is 6 × 6px
-  upscaleFactor: 1, // the resulting image
-  seed: 44, // seed for random generator
-  colorFactor: 0.75, // darken the overall color
-};
+```txt
+width=8
+height=20
+seed=44
+scale=6
+curve=0-0--100-75
 ```
 
-![](./docs/example/brother/photo_upscale.png)
+![](./example/brother/photo_upscale.png)
 
 ### Results
 
-![](./docs/example/brother/IMG_3133.jpg)
-![](./docs/example/brother/IMG_9221.jpg)
+![](./example/brother/IMG_3133.jpg)
+![](./example/brother/IMG_9221.jpg)

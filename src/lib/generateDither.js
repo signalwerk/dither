@@ -9,7 +9,8 @@ const setSeed = (seed) => {
 };
 
 const lcg = () => {
-  randomState = (RANDOM_MULTIPLIER * randomState + RANDOM_INCREMENT) % RANDOM_MODULUS;
+  randomState =
+    (RANDOM_MULTIPLIER * randomState + RANDOM_INCREMENT) % RANDOM_MODULUS;
   return randomState / RANDOM_MODULUS;
 };
 
